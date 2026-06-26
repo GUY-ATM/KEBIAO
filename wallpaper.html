@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>壁纸选择</title>
+    <script src="libs/tailwindcss.js"></script>
+    <link rel="stylesheet" href="libs/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#6366F1',
+                        neutral: '#64748B',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .wallpaper-item {
+                @apply relative overflow-hidden rounded-lg transition-all duration-300 ease-in-out cursor-pointer;
+                opacity: 0;
+                transform: translateY(20px);
+                animation: fadeInUp 0.5s ease forwards;
+            }
+            @keyframes fadeInUp {
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            .wallpaper-item:hover {
+                @apply transform scale-[1.02] shadow-xl;
+            }
+            .wallpaper-item.selected {
+                @apply ring-4 ring-primary ring-offset-2;
+            }
+            .wallpaper-item img {
+                @apply w-full h-40 md:h-56 rounded-lg object-cover;
+            }
+            .selected-badge {
+                @apply absolute -top-2 -right-2 bg-secondary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center;
+            }
+            .select-btn {
+                @apply px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center;
+            }
+            .select-btn-not-selected {
+                @apply bg-gray-100 text-gray-700 hover:bg-primary hover:text-white border border-gray-200;
+            }
+            .select-btn-selected {
+                @apply bg-primary text-white border border-primary;
+            }
+            .apply-btn {
+                @apply px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-medium transition-all duration-200 flex items-center justify-center;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-800">
+    <header class="bg-white fixed top-0 left-0 right-0 z-50 transition-all duration-300">
+        <div class="container mx-auto px-4 py-0 flex justify-center mt-8 mb-1 items-center gap-4">
+            <button id="backBtn" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 flex items-center transition-all duration-200" style="border-radius: 12px;" onclick="window.location.href='kebiao.html'">
+                <i class="fa fa-arrow-left mr-2"></i>返回
+            </button>
+            <button id="colorsBtn" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 flex items-center transition-all duration-200" style="border-radius: 12px;" onclick="window.location.href='colors.html'">
+                <i class="fa-solid fa-palette mr-2"></i>主题
+            </button>
+            <button id="applyBtn" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 flex items-center transition-all duration-200" style="border-radius: 12px;" onclick="applyWallpaper()">
+                <i class="fa fa-check mr-2"></i>应用
+            </button>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 pt-16 pb-4">
+        <section class="text-center mt-4 max-w-3xl mx-auto">
+            <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold mb-4 text-gray-800">不拒本心 是谓自在</h2>
+        </section>
+
+        <div id="wallpaperGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+        </div>
+    </main>
+
+    <div id="toast" class="fixed bottom-6 right-6 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center">
+        <i class="fa fa-check-circle mr-2"></i>
+        <span>操作成功</span>
+    </div>
+
+    <script>
+        const wallpapers = [
+            { id: 0, path: '', isLocal: true, placeholder: true },
+            { id: 1, path: 'img/view/th.jpg' },
+            { id: 2, path: 'img/view/th (1).jpg' },
+            { id: 3, path: 'img/view/th (2).jpg' },
+            { id: 4, path: 'img/view/th (3).jpg' },
+            { id: 5, path: 'img/view/th (4).jpg' },
+            { id: 6, path: 'img/view/th (5).jpg' },
+            { id: 7, path: 'img/view/th (6).jpg' },
+            { id: 8, path: 'img/view/th (7).jpg' },
+            { id: 9, path: 'img/view/th (8).jpg' }
+        ];
+
+        let selectedWallpaper = localStorage.getItem('selectedWallpaper') || null;
+        let isLocalWallpaper = selectedWallpaper && selectedWallpaper.startsWith('data:');
+
+        function renderWallpapers() {
+            const grid = document.getElementById('wallpaperGrid');
+            grid.innerHTML = wallpapers.map((wp, index) => {
+                const delay = index * 0.08;
+                if (wp.placeholder) {
+                    return `
+                    <div class="wallpaper-item"
+                         onclick="selectWallpaper('local', this)"
+                         data-path="local"
+                         style="animation-delay: ${delay}s">
+                        <div class="w-full h-40 md:h-56 rounded-lg object-cover bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary transition-colors">
+                            <i class="fa fa-plus text-3xl mb-2"></i>
+                            <span class="text-sm">本地图片</span>
+                        </div> 
+                    </div>`;
+                }
+                return `
+                <div class="wallpaper-item ${selectedWallpaper === wp.path ? 'selected' : ''}"
+                     onclick="selectWallpaper('${wp.path}', this)"
+                     data-path="${wp.path}"
+                     style="animation-delay: ${delay}s">
+                    <img src="${wp.path}" alt="壁纸" loading="lazy">
+                </div>`;
+            }).join('');
+        }
+
+        function selectWallpaper(path, element) {
+            if (path === 'local') {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            selectedWallpaper = event.target.result;
+                            isLocalWallpaper = true;
+                            localStorage.setItem('selectedWallpaper', selectedWallpaper);
+                            localStorage.setItem('explicitWallpaperSelected', 'true');
+                            localStorage.removeItem('saved_video_background_path');
+                            localStorage.removeItem('customVideo');
+                            if (window.plus) {
+                                plus.storage.removeItem('saved_video_background_path');
+                            }
+                            showToast('已选择本地图片');
+                            setTimeout(() => {
+                                window.location.href = 'kebiao.html';
+                            }, 500);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                };
+                input.click();
+                return;
+            }
+            if (selectedWallpaper === path) {
+                selectedWallpaper = null;
+                isLocalWallpaper = false;
+                localStorage.removeItem('selectedWallpaper');
+                element.classList.remove('selected');
+                showToast('已取消选择');
+                return;
+            }
+            document.querySelectorAll('.wallpaper-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            selectedWallpaper = path;
+            isLocalWallpaper = false;
+            localStorage.setItem('selectedWallpaper', path);
+            element.classList.add('selected');
+            showToast('已选择壁纸');
+        }
+
+        function applyWallpaper() {
+            if (selectedWallpaper) {
+                localStorage.setItem('selectedWallpaper', selectedWallpaper);
+                localStorage.setItem('explicitWallpaperSelected', 'true');
+                localStorage.removeItem('saved_video_background_path');
+                localStorage.removeItem('customVideo');
+                if (window.plus) {
+                    plus.storage.removeItem('saved_video_background_path');
+                }
+                showToast('壁纸应用成功');
+                setTimeout(() => {
+                    window.location.href = 'kebiao.html';
+                }, 500);
+            } else {
+                showToast('请先选择一张壁纸');
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.querySelector('span').textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+                toast.classList.remove('translate-y-0', 'opacity-100');
+            }, 2000);
+        }
+
+        renderWallpapers();
+    </script>
+</body>
+</html>

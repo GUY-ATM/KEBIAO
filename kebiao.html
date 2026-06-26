@@ -1,0 +1,6017 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+	<head>
+		<meta charset="utf-8" />
+		<meta content="width=device-width, initial-scale=1.0" name="viewport" />
+		<title>我的课程表</title>
+		<script src="libs/tailwindcss.js"></script>
+		<link rel="stylesheet" href="libs/css/all.min.css">
+		<link rel="stylesheet" href="swipe-control.css">
+		<script src="libs/crypto-js.min.js"></script>
+		<script src="libs/jsencrypt.min.js"></script>
+		<script>
+			// 从localStorage获取配色方案
+			function getCoursePaletteFromStorage() {
+				const courseStr = localStorage.getItem('course');
+				if (courseStr) {
+					try {
+						return JSON.parse(courseStr);
+					} catch (e) {
+						console.error('解析配色方案失败:', e);
+						return null;
+					}
+				}
+				return null;
+			}
+
+			// 检查并直接应用配色方案，避免页面刷新
+			function checkAndApplyColorScheme() {
+				const currentPalette = getCoursePaletteFromStorage();
+				const lastAppliedPalette = localStorage.getItem('lastAppliedPalette');
+
+				if (currentPalette && lastAppliedPalette) {
+					const lastApplied = JSON.parse(lastAppliedPalette);
+					// 比较配色方案是否不同
+					if (JSON.stringify(currentPalette) !== JSON.stringify(lastApplied)) {
+						// 更新记录但不刷新页面
+						localStorage.setItem('lastAppliedPalette', JSON.stringify(currentPalette));
+						// 这里可以添加直接应用配色方案的代码（如果需要）
+						return true;
+					}
+				} else if (currentPalette) {
+					// 第一次应用配色方案
+					localStorage.setItem('lastAppliedPalette', JSON.stringify(currentPalette));
+				}
+				return false;
+			}
+
+			// Tailwind CSS 配置
+			const coursePalette = getCoursePaletteFromStorage();
+			tailwind.config = {
+				theme: {
+					extend: {
+						colors: {
+							primary: '#3B82F6', // 蓝色作为主色调
+							secondary: '#EC4899', // 辅助色：粉色，用于强调和交互元素
+							neutral: {
+								100: '#F3F4F6',
+								200: '#E5E7EB',
+								300: '#D1D5DB',
+								400: '#9CA3AF',
+								500: '#6B7280',
+								600: '#4B5563',
+								700: '#374151',
+								800: '#1F2937',
+								900: '#111827',
+							},
+							course: coursePalette || {
+								color1: '#66ccff', // 蓝色（比浅色版深，比原版浅）
+								color2: '#66e0c0', // 绿色（平衡鲜艳度）
+								color3: '#ff99cc', // 粉色（适中饱和度）
+								color4: '#ccb3ff', // 紫色（柔和且清晰）
+								color5: '#60A5FA', // 浅蓝色（与 color1 互补）
+							}
+						},
+						fontFamily: {
+							sans: ['Inter', 'system-ui', 'sans-serif'],
+						},
+						boxShadow: {
+							'card': '0 4px 15px rgba(0, 0, 0, 0.32)',
+							'card-hover': '0 8px 25px rgba(0, 0, 0, 0.42)',
+							'modal': '0 10px 50px rgba(0, 0, 0, 0.15)',
+						}
+					},
+				}
+			}
+		</script>
+		<style type="text/tailwindcss">
+			@layer utilities {
+            /* 内容自动可见性 */
+            .content-auto {
+                content-visibility: auto;
+            }
+            /* 隐藏滚动条 */
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            /* 文字阴影 */
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            /* 主要渐变背景 */
+            .bg-gradient-primary {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }
+            
+            /* 课程卡片样式 */
+            .course-card {
+                @apply rounded-3xl p-3 mb-3 transition-all duration-300 transform hover:-translate-y-1;
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+            .course-card:hover {
+                background: rgba(255, 255, 255, 0.15);
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            }
+			/* 自定义class：fixed-viewport（可自定义命名） */
+			.fixed-viewport {
+			  position: fixed; /* 核心：固定定位，脱离文档流 */
+			}
+            /* 课程单元格样式 */
+        .course-cell {
+            @apply rounded-[10px] transition-all duration-200 hover:shadow-md cursor-pointer hover:-translate-y-0.5 overflow-hidden p-0;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 100% !important;
+            box-sizing: border-box !important;
+            /* 确保内容不会影响块的长度 */
+            text-overflow: ellipsis;
+            white-space: normal;
+            word-wrap: break-word;
+            font-size: 12px; /* 统一较小字体 */
+            line-height: 1.2; /* 设置行高 */
+            text-align: center; /* 居中对齐 */
+            /* 强制固定尺寸 */
+            flex-shrink: 0 !important;
+            flex-grow: 0 !important;
+        }
+        
+       
+                    
+        /* 表格文字大小统一控制样式 */
+        .table-text-control {
+            /* 课程名称文字大小 */
+            --course-name-size: 16px;
+            /* 地点信息文字大小 */
+            --location-text-size: 16px;
+        }
+                    
+        /* 应用到所有表格课程单元格 - 增强优先级 */
+        .table-text-control .course-cell,
+        .table-text-control .course-cell.text-xs {
+            font-size: var(--course-name-size) !important;
+        }
+        
+        /* 针对动态生成内容中的课程名称 */
+        .table-text-control .course-cell div.font-medium,
+        .table-text-control .course-cell div.font-medium.text-xs {
+            font-size: var(--course-name-size) !important;
+        }
+                    
+        /* 应用到地点信息 - 增强优先级 */
+        .table-text-control .course-cell span,
+        .table-text-control .course-cell .text-\[10px\],
+        .table-text-control .course-cell span.text-\[10px\],
+        .table-text-control .course-cell div.text-\[10px\] {
+            font-size: var(--location-text-size) !important;
+        }
+            
+            
+            /* 红色文本类 */
+            .text-red-500 {
+                color: #ef4444; /* red-500 */
+            }
+            
+            /* 课程详情模态框背景样式 */
+            .modal-backdrop {
+                @apply fixed inset-0 bg-black/50 z-50 flex justify-center items-center opacity-0 pointer-events-none;
+                z-index: 98; /* 确保高于导航栏 */
+                transition: opacity 500ms cubic-bezier(0.4, 0, 0.2, 1); /* 统一过渡时间和更平滑的曲线 */
+                width: 100vw;
+                height: 100vh;
+            }
+            
+            /* 表格固定布局样式 */
+            #excelViewContainer {
+                table-layout: fixed !important;
+                width: 100% !important;
+            }
+            
+            #excelView th,
+            #excelView td {
+                width: 14.285% !important;
+                min-width: 80px !important;
+                max-width: 80px !important;
+                overflow: hidden !important;
+                box-sizing: border-box !important;
+            }
+            .modal-backdrop.active {
+                @apply opacity-100 pointer-events-auto;
+            }
+            
+            /* 课程详情卡片样式 - 简化版 */
+            .modal-content {
+                @apply rounded-3xl shadow-modal mx-4;
+                background: #ffffff;
+                width: 100%;
+                max-width: 90vw; /* 最大宽度为视窗宽度的90% */
+                position: relative;
+                margin: 0 auto;
+                transform: scale(0.95);
+                opacity: 0;
+				padding: 4px; /* 增加内边距，让内容有空间 */
+                transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+                z-index: 100;
+            }
+            
+            .modal-backdrop.active .modal-content {
+                /* 显示状态：简单的缩放和淡入效果 */
+                transform: scale(1);
+                opacity: 1;
+            }
+            
+            /* 关闭动画：简单的缩放和淡出效果 */
+            .modal-backdrop.closing .modal-content {
+                transform: scale(0.95);
+                opacity: 0;
+                transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            /* 自定义课程详情内容容器 - 屏幕中央显示 */
+            #modalContent {
+               /* 设置为固定定位，相对于屏幕定位 */
+               position: fixed;
+               /* 屏幕中央定位 */
+               top: 50%;
+               left: 50%;
+               transform: translate(-50%, -50%);
+               /* 确保z-index足够高，在其他元素之上 */
+               background: #ffffff;
+               width: 100%;
+               max-width: 90vw; /* 最大宽度为视窗宽度的90% */
+               margin: 0;
+               border-radius: 30px;
+               /* 如果需要调整高度，取消下面的注释并设置合适的值 */
+               /* min-height: 400px; */
+               /* 过渡效果，使位置变化更平滑 */
+               transition: all 300ms ease;
+}
+            
+            /* 关闭按钮点击反馈动画 */
+            .close-btn {
+                transition: transform 150ms ease;
+            }
+            .close-btn:active {
+                transform: scale(0.95);
+            }
+
+
+            /* 日期滑轨样式 */
+            .date-item {
+                @apply flex flex-col items-center w-12 px-2 py-2 transition-all duration-200 cursor-pointer rounded-[10px] min-w-[48px] shadow-sm border border-white/20;
+                background: rgba(255, 255, 255, 0.2);
+            }
+            
+            /* 日期滑轨容器样式 - 隐藏超出边框部分 */
+            #dateScrollContainer {
+                overflow-x: auto;
+                overflow-y: visible;
+                border-radius: 34px;
+                padding-top: 3px;
+                padding-bottom: 0px;
+            }
+			/* 日期滑轨容器样悬停状态的样式*/
+            .date-item:hover {
+                @apply shadow-md transform -translate-y-2 border-white/40;
+                background: rgba(255, 255, 255, 0.15);
+            }
+            .date-item.today {
+                @apply text-primary font-bold shadow-md border-primary/40;
+                background: rgba(59, 130, 246, 0.15);
+            }
+            .date-item.selected {
+                @apply text-white font-bold shadow-lg border-primary/60;
+                background: rgba(59, 130, 246, 0.8);
+            }
+            
+            /* 临时选中状态（滑动过程中的动画效果）*/
+            .date-item.temp-selected {
+                @apply text-white font-bold shadow-lg border-primary/60;
+                background: rgba(59, 130, 246, 0.8);
+                transform: translateY(-15px); /* 上移15px，增加高度 */
+                transition: all 0.5s ease; /* 动画时间增加到0.5s，减慢速度 */
+            }
+            .date-day {
+                @apply text-xs mb-1;
+            }
+            .date-number {
+                @apply text-sm font-medium;
+            }
+            
+            /* 背景图片样式 */
+            .bg-image {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                z-index: -2;
+                filter: brightness(1);
+            }
+            
+            /* 背景视频样式 */
+            .bg-video {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                z-index: -1;
+                filter: brightness(1);
+                object-position: var(--video-position, center); /* 支持自定义水平位置 */
+                display: none; /* 默认隐藏，只有用户设置视频后才显示 */
+            }
+            
+            .atom-spinner {
+                height: 130px;
+                width: 130px;
+                overflow: hidden;
+                position: relative;
+            }
+            
+            .atom-spinner .spinner-inner {
+                position: relative;
+                display: block;
+                height: 100%;
+                width: 100%;
+                transform-style: preserve-3d;
+            }
+            
+            /* 用CSS圆形替代特殊字符，解决Chrome显示问题 */
+            .atom-spinner .spinner-circle {
+                display: block;
+                position: absolute;
+                width: calc(130px * 0.15);
+                height: calc(130px * 0.15);
+                background-color: #ff1d5e;
+                border-radius: 50%;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+            
+            .atom-spinner .spinner-line {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                border-radius: 50%;
+                border-left-width: calc(130px / 25);
+                border-top-width: calc(130px / 25);
+                border-left-color: #ff1d5e;
+                border-left-style: solid;
+                border-top-style: solid;
+                border-top-color: transparent;
+                transform-origin: center;
+            }
+            
+            .atom-spinner .spinner-line:nth-child(1) {
+                animation: atom-spinner-animation-1 1s linear infinite;
+                transform: rotateZ(120deg) rotateX(66deg) rotateZ(0deg);
+            }
+            
+            .atom-spinner .spinner-line:nth-child(2) {
+                animation: atom-spinner-animation-2 1s linear infinite;
+                transform: rotateZ(240deg) rotateX(66deg) rotateZ(0deg);
+            }
+            
+            .atom-spinner .spinner-line:nth-child(3) {
+                animation: atom-spinner-animation-3 1s linear infinite;
+                transform: rotateZ(360deg) rotateX(66deg) rotateZ(0deg);
+            }
+			/* loginStatus错误信息缩放动画效果 */
+            @keyframes statusErrorScale {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+           }
+
+           #loginStatus.error-shake {
+                animation: statusErrorScale 0.3s ease-in-out;
+           }
+            
+            @keyframes atom-spinner-animation-1 {
+                100% {
+                    transform: rotateZ(120deg) rotateX(66deg) rotateZ(360deg);
+                }
+            }
+            
+            @keyframes atom-spinner-animation-2 {
+                100% {
+                    transform: rotateZ(240deg) rotateX(66deg) rotateZ(360deg);
+                }
+            }
+            
+            @keyframes atom-spinner-animation-3 {
+                100% {
+                    transform: rotateZ(360deg) rotateX(66deg) rotateZ(360deg);
+                }
+            }
+			 /* 1. 隐藏原生复选框，保留点击交互 */
+			  .custom-blue-checkbox {
+			    appearance: none; /* 清除浏览器默认样式 */
+			    -webkit-appearance: none;
+			    width: 16px; /* 自定义勾选框宽度 */
+			    height: 16px; /* 自定义勾选框高度 */
+			    border: 2px solid #d1d5db; /* 未选择时：灰色边框 */
+			    border-radius: 4px; /* 圆角，优化视觉 */
+			    cursor: pointer; /* 鼠标悬浮时显示“手”形，提示可点击 */
+			    position: relative; /* 用于定位勾选符号 */
+			  }
+			
+			  /* 2. 选择状态：蓝色边框 + 蓝色背景 */
+			  .custom-blue-checkbox:checked {
+			    border-color: #2563eb; /* 选择时：蓝色边框（text-primary 对应的蓝色值） */
+			    background-color: #2563eb; /* 选择时：蓝色背景 */
+			  }
+			
+			  /* 3. 选择状态：白色勾号（与蓝色背景对比，更清晰） */
+			  .custom-blue-checkbox:checked::after {
+			    content: "✓"; /* 勾选符号 */
+			    position: absolute;
+			    color: white; /* 勾号白色，突出显示 */
+			    font-size: 12px; /* 勾号大小，适配勾选框 */
+			    top: 50%; /* 垂直居中 */
+			    left: 50%; /* 水平居中 */
+			    transform: translate(-50%, -50%); /* 精准居中 */
+			  }
+			  /* 导入教务系统按钮点击缩放缩放效果类 */
+			  .btn-scale {
+			    transition: transform 0.2s ease; /* 过渡动画：0.2秒平滑缩放 */
+			  }
+			  
+			  /* 点击时的缩放状态 */
+			  .btn-scale:active {
+			    transform: scale(0.9); /* 缩小至原尺寸的90%，使效果更明显 */
+			  }
+			  
+			  /* 移除鼠标悬停时的放大效果 */
+        }
+    </style>
+	</head>
+	<body class="font-sans text-neutral-800 min-h-screen pb-2 pt-10 page-loading relative overflow-x-hidden"
+		id="pageBody">
+		<!-- 背景图片元素（默认随机显示img/view下的图片） -->
+		<img class="bg-image" id="bgImage" src="" alt="背景图片">
+		<!-- 背景视频元素（用户设置后才显示） -->
+		<video class="bg-video" loop muted playsinline preload="auto">
+			<p>您的浏览器不支持视频背景播放</p>
+		</video>
+		<script>
+			(function() {
+				const bgImages = [
+					'img/view/th.jpg',
+					'img/view/th (1).jpg',
+					'img/view/th (2).jpg',
+					'img/view/th (3).jpg',
+					'img/view/th (4).jpg',
+					'img/view/th (5).jpg',
+					'img/view/th (6).jpg',
+					'img/view/th (7).jpg'
+				];
+				const bgImage = document.getElementById('bgImage');
+				const bgVideo = document.querySelector('.bg-video');
+				if (bgImage) {
+					const savedVideoPath = localStorage.getItem('saved_video_background_path');
+					const savedWallpaper = localStorage.getItem('selectedWallpaper');
+					const explicitWallpaperSelected = localStorage.getItem('explicitWallpaperSelected') === 'true';
+					if (savedVideoPath && !explicitWallpaperSelected) {
+						if (bgVideo) {
+							bgVideo.style.display = 'block';
+							bgVideo.src = savedVideoPath;
+							bgVideo.load();
+						}
+						bgImage.style.display = 'none';
+					} else if (savedWallpaper) {
+						bgImage.src = savedWallpaper;
+						bgImage.style.display = 'block';
+						if (bgVideo) {
+							bgVideo.style.display = 'none';
+						}
+					} else {
+						const randomIndex = Math.floor(Math.random() * bgImages.length);
+						bgImage.src = bgImages[randomIndex];
+						bgImage.style.display = 'block';
+						if (bgVideo) {
+							bgVideo.style.display = 'none';
+						}
+					}
+				}
+			})();
+		</script>
+		<!-- 加载指示器 -->
+		<div id="loadingIndicator">
+			<div style="display: flex; flex-direction: column; align-items: center;">
+				<div
+					style="width: 48px; height: 48px; border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;">
+				</div>
+				<div style="margin-top: 16px; color: #666; font-size: 14px;">正在加载课表...</div>
+			</div>
+		</div>
+
+		<style>
+			@keyframes spin {
+				0% {
+					transform: rotate(0deg);
+				}
+
+				100% {
+					transform: rotate(360deg);
+				}
+			}
+		</style>
+		<style>
+			/* 关键样式：确保加载指示器始终可见 */
+			#loadingIndicator {
+				position: fixed !important;
+				top: 0 !important;
+				left: 0 !important;
+				right: 0 !important;
+				bottom: 0 !important;
+				background: #ffffff !important;
+				z-index: 9999 !important;
+				display: flex !important;
+				align-items: center !important;
+				justify-content: center !important;
+				opacity: 1 !important;
+				visibility: visible !important;
+			}
+
+			#loadingIndicator.hidden {
+				opacity: 0 !important;
+				visibility: hidden !important;
+				pointer-events: none !important;
+				transition: opacity 0.3s ease, visibility 0.3s ease !important;
+			}
+
+			/* 简化的页面加载样式 */
+			body.page-loading {
+				overflow: hidden;
+			}
+
+			body.page-loaded {
+				overflow: auto;
+			}
+
+			/* 确保加载完成后所有元素都正常显示 */
+			body.page-loaded *:not(.message-overlay):not(h1):not(.text-neutral) {
+				opacity: 1 !important;
+				visibility: visible !important;
+				pointer-events: auto !important;
+			}
+		</style>
+		<style>
+			#timeColumn {
+				width: 80px;
+				flex-shrink: 0;
+				position: relative;
+				height: 800px;
+				/* 设置一个固定高度，以便绝对定位 */
+			}
+
+			#timeColumn>div {
+				height: 50px;
+				/* 与表格th高度一致 */
+			}
+
+			#excelViewContainer {
+				/* 1. 设置容器宽度（必须，否则会默认占满父容器，看不出居中效果） */
+				width: 100%;
+				/* 可根据需求调整，如固定值 1200px */
+				/* 2. 水平居中：左右边距自动分配 */
+				margin: 0 auto;
+				/* 保留原样式 */
+				border-collapse: collapse;
+				flex: 1;
+				min-width: 0;
+			}
+
+			/* 确保两个容器能够正确显示 */
+			#listViewContainer,
+			#excelViewContainer {
+				transition: opacity 0.3s ease-in-out;
+			}
+
+			#listViewContainer.hidden,
+			#excelViewContainer.hidden {
+				display: none;
+			}
+
+			/* 时间块的灵活定位样式 */
+			.time-block {
+				position: absolute;
+				width: 100%;
+				padding: 5px;
+				box-sizing: border-box;
+			}
+
+			.time-block-spacer {
+				margin-bottom: 5px;
+			}
+
+			.nav-item {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				color: #666;
+				font-size: 14px;
+				padding: 5px 0;
+				width: 25%;
+				/* 注意这里改为 25% 因为有 4 个导航项 */
+			}
+
+			.nav-item i {
+				font-size: 24px;
+				margin-bottom: 2px;
+			}
+
+			.nav-item.active {
+				color: #007aff;
+			}
+
+			/* 响应式导航按钮样式 - 基于411px视窗宽度优化 */
+			#navButtonsContainer {
+				/* 默认间距设置，基于clamp(12px, 3vw, 40px)优化 */
+				gap: clamp(10px, 2.5vw, 30px);
+			}
+
+			#navButtonsContainer button {
+				/* 基于px-2 py-1的响应式内边距，增加左右内边距让按钮更长 */
+				padding: clamp(0.25rem, 1vw, 0.5rem) clamp(0.5rem, 1.5vw, 0.8rem);
+				/* 响应式字体大小 */
+				font-size: clamp(0.75rem, 1.8vw, 0.875rem);
+				/* 响应式圆角 */
+				border-radius: clamp(8px, 2vw, 12px);
+				/* 平滑过渡效果 */
+				transition: all 0.2s ease-in-out;
+				/* 增加最小宽度让按钮更长 */
+				min-width: clamp(60px, 15vw, 100px);
+			}
+
+			#navButtonsContainer button i {
+				/* 响应式图标大小 */
+				font-size: clamp(0.8rem, 2vw, 1.1rem);
+				/* 图标右边距 */
+				margin-right: clamp(0.1rem, 0.5vw, 0.25rem);
+			}
+
+			/* 针对小屏幕的特殊优化 */
+			@media (max-width: 410px) {
+				#navButtonsContainer {
+					gap: clamp(5px, 1.5vw, 15px);
+				}
+
+				#navButtonsContainer button {
+					padding: 0.2rem 0.4rem;
+					font-size: 0.7rem;
+					border-radius: 6px;
+					min-width: 50px;
+				}
+
+				#navButtonsContainer button i {
+					font-size: 0.7rem;
+					margin-right: 0.1rem;
+				}
+			}
+
+			/* 针对大屏幕的优化 */
+			@media (min-width: 1200px) {
+				#navButtonsContainer {
+					gap: clamp(20px, 2vw, 50px);
+				}
+
+				#navButtonsContainer button {
+					padding: 0.6rem 1rem;
+					font-size: 0.95rem;
+					border-radius: 12px;
+					min-width: 100px;
+				}
+
+				#navButtonsContainer button i {
+					font-size: 1.2rem;
+					margin-right: 0.3rem;
+				}
+			}
+
+			/* 考试科目文字固定长度与溢出隐藏 */
+			.exam-subject-container {
+				width: 200px; /* 固定宽度 */
+				white-space: nowrap; /* 不换行 */
+				overflow: hidden; /* 隐藏溢出内容 */
+				text-overflow: ellipsis; /* 溢出部分显示省略号 */
+			}
+
+			/* 在小屏幕上调整考试科目文字宽度 */
+			@media (max-width: 410px) {
+				.exam-subject-container {
+					width: 140px; /* 在小屏幕上减少宽度 */
+				}
+			}
+
+			@media (max-width: 350px) {
+				.exam-subject-container {
+					width: 120px; /* 在更小屏幕上进一步减少宽度 */
+				}
+			}
+
+			/* 透明容器样式 - 作为灵动岛的定位基础 */
+			#topTransparentContainer {
+				width: 100%;
+				height: 4px;
+				/* 增加高度以容纳展开状态的灵动岛 */
+				background-color: transparent;
+				/* 更彻底的透明 */
+				position: fixed;
+				top: 0;
+				left: 0;
+				margin: 7px 0 0 0;
+				/* 添加顶部间距，确保胶囊与顶部保持距离 */
+				/* 关键：与状态栏区域融合 */
+				z-index: 100001 !important;
+				/* 高于遮罩层 */
+				display: flex;
+				align-items: flex-start;
+				justify-content: center;
+			}
+
+
+
+			/* 灵动岛主体样式 - 使用单独容器实现 */
+			#islandContainer {
+				/* 尺寸保持一致：宽度约130px，高度35px */
+				width: 1px;
+				height: 1px;
+
+				/* 相对定位：让内部绝对定位元素相对于此容器定位 */
+				position: relative;
+
+				/* 背景色使用深灰黑色 */
+				background-color: #000000;
+
+				/* 圆角优化：高度的一半，呈现完美胶囊形 */
+				border-radius: 18px;
+
+				/* 细节优化：添加微妙阴影增强立体感 */
+
+				/* 过渡动画：使用更接近苹果系统的默认曲线 */
+				transition: all 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+
+				/* z-index设置，确保在背景内容上方且比遮罩层高一层 */
+				z-index: 9999 !important;
+
+				/* 光标样式：指示可点击 */
+				cursor: pointer;
+			}
+
+			/* 灵动岛展开状态样式 - 向下延伸展开，保持与顶部距离不变 */
+			#islandContainer.expanded {
+				/* 展开后的尺寸 - 左右和向下扩展 */
+				width: calc(100% - 10px);
+				/* 保持与视图界面的左右间距 */
+				max-width: 400px;
+				/* 最大宽度限制 */
+				height: 200px;
+				margin: 0 7px;
+				/* 左右间距 */
+
+				/* 展开状态的圆角 - 圆角化矩形 */
+				border-radius: 38px;
+
+				/* 优化的变换效果 */
+				transform: translateY(0);
+
+				/* 优化过渡动画 - 采用更接近苹果风格的动画曲线 */
+				transition: all 0.5s cubic-bezier(0.3, 0.1, 0.2, 1);
+
+				/* 展开状态的阴影增强 */
+				box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+			}
+
+			/* 苹果风格的特殊动画类 - 用于分阶段动画效果 */
+			#islandContainer.phase1 {
+				transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+				transform: scale(1.05);
+			}
+
+			#islandContainer.phase2 {
+				/* 调整为苹果常用的展开动画曲线 */
+				transition: all 0.3s cubic-bezier(0.3, 0.1, 0.2, 1);
+				border-radius: 38px;
+				/* 与expanded类保持一致 */
+			}
+
+			#islandContainer.phase3 {
+				/* 调整为更自然的结束阶段曲线 */
+				transition: all 0.2s cubic-bezier(0.1, 0.7, 0.1, 1);
+				transform: scale(1);
+				border-radius: 38px;
+				/* 与expanded类保持一致 */
+			}
+
+			/* 展开内容从模糊到清晰、从透明到显示的效果 - 确保仅在动画触发时显示 */
+			#islandContent {
+				/* 强制默认隐藏，优先级高于内联样式 */
+				opacity: 0 !important;
+				filter: blur(4px) !important;
+				transform: translateY(-20px) !important;
+				transition: opacity 0.1s ease-out, filter 0.1s ease-out, transform 0.1s ease-out !important;
+			}
+
+			#islandContent.expanded-content {
+				opacity: 1 !important;
+				filter: blur(0) !important;
+				transform: translateY(0) !important;
+				/* 过渡效果已在默认样式中定义 */
+				/* 添加滚动功能 */
+				overflow-y: auto;
+				max-height: 180px;
+			}
+
+			/* 非展开状态下的内容强制隐藏 */
+			#islandContainer:not(.expanded) #islandContent {
+				opacity: 0 !important;
+				filter: blur(4px) !important;
+				transform: translateY(-20px) !important;
+			}
+
+			/* 导航栏按钮点击缩放互动效果 */
+			#navButtonsContainer button {
+				transition: transform 0.1s ease;
+			}
+
+			#navButtonsContainer button:active {
+				transform: scale(0.9);
+			}
+
+			/* 课程详情弹窗收缩状态的胶囊样式 */
+			#islandContainer.course-modal-shrink {
+				transition: width 0.2s cubic-bezier(0.3, 0.1, 0.2, 1);
+			}
+
+			#islandContainer.course-modal-shrink.growing {
+				width: 180px;
+				/* 生长状态的宽度 */
+			}
+
+			#islandContainer.course-modal-shrink.shrinking {
+				transition: width 0.3s cubic-bezier(0.3, 0.1, 0.2, 1);
+				width: 130px;
+				/* 收缩状态的宽度 - 用户可以根据需要修改这个值 */
+				height: 38px;
+				/* 胶囊高度 - 用户可以根据需要修改这个值 */
+				border-radius: 18px;
+				/* 胶囊圆角 - 用户可以根据需要修改这个值 */
+			}
+
+			#navButtonsContainer button:active i,
+			#navButtonsContainer button:active span {
+				transform: scale(0.9);
+				transition: transform 0.1s ease;
+			}
+
+			/* 媒体查询：当视窗宽度小于411px时，缩小导入视频和导入课程图标 */
+			@media (max-width: 410px) {
+				/* 缩小图标本身 */
+				#islandUploadArea .fa-clapperboard,
+				#islandUploadArea .fa-folder {
+					font-size: 7rem !important;
+				}
+				
+				/* 缩小图标下方的文字 */
+				#islandUploadArea span {
+					font-size: 1rem !important;
+				}
+				
+				/* 缩小可点击区域 */
+				#videoUploadClickArea,
+				#fileUploadClickArea {
+					width: 7rem !important;
+					height: 7rem !important;
+				}
+			}
+		</style>
+		<!-- 顶部导航栏 -->
+		<header class="transparent text-white relative z-50">
+			<!-- 透明容器和小黑圆 -->
+			<div id="topTransparentContainer">
+				<!-- 黑色胶囊容器 - 包含笑脸图标 -->
+				<div id="islandContainer">
+					<!-- 展开状态显示的内容，默认隐藏且模糊 -->
+					<div id="islandContent"
+						class="absolute inset-0 flex flex-col items-center justify-center text-white opacity-0 filter blur(4px) transition-all duration-500">
+						<!-- 上传图标 -->
+						<div class="upload-icon-container" id="islandUploadArea"
+							style="display: flex; align-items: center; justify-content: center; cursor: pointer; width: 100%; height: 100%;">
+							<i class="fa-solid fa-cloud-arrow-up text-blue-500" style="font-size: 8rem;"></i>
+							<input type="file" id="islandFileInput" accept=".json,application/json"
+								style="display: none;">
+						</div>
+					</div>
+
+					<!-- 默认状态下不显示任何图标 -->
+					<div id="islandDefaultIcon" class="absolute inset-0 flex items-center justify-center text-white"
+						style="display: none;">
+					</div>
+				</div>
+			</div>
+
+			<div class="container mx-auto px-4 py-1 flex justify-center items-center ">
+				<div id="navButtonsContainer" class="flex flex-nowrap justify-center whitespace-nowrap"
+					style="position: relative; z-index: 20; transition: opacity 0.3s ease-in-out; gap: clamp(12px, 3vw, 40px);">
+					<!-- 切换按钮 -->
+					<button
+						class="bg-white/20 hover:bg-white/30 transition-colors px-2 py-1 rounded-[10px] text-sm flex items-center whitespace-nowrap relative"
+						id="yearBtn" onclick="window.location.href='colors.html'">
+						<i class="fa-solid fa-palette"></i>
+						<span> 主题 </span>
+						<span id="wallpaperBadge" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-2 h-2"></span>
+					</button>
+					<button
+						class="bg-white/20 hover:bg-white/30 transition-colors px-2 py-1 rounded-[10px] text-sm flex items-center whitespace-nowrap"
+						id="viewToggleBtn">
+						<i class="fa-solid fa-table-cells-large mr-2"></i>
+						<span> 表格 </span>
+					</button>
+					<button
+						class="bg-white/20 hover:bg-white/30 transition-colors px-2 py-1 rounded-[10px] text-sm flex items-center whitespace-nowrap"
+						id="adjustBtn">
+						<i class="fa-solid fa-sliders mr-2"></i>
+						<span> 调节 </span>
+					</button>
+					<button
+						class="bg-white/20 hover:bg-white/30 transition-colors px-2 py-1 rounded-[10px] text-sm flex items-center whitespace-nowrap"
+						id="importBtn">
+						<i class="fa-solid fa-upload mr-2"></i>
+						<span> 导入 </span>
+					</button>
+					<button
+						class="bg-white/20 hover:bg-white/30 transition-colors px-2 py-1 rounded-[10px] text-sm flex items-center whitespace-nowrap"
+						id="examBtn">
+						<i class="fa-solid fa-file-lines mr-2"></i>
+						<span> 考试 </span>
+					</button>
+				</div>
+			</div>
+		</header>
+		<!-- 日期滑轨容器 -->
+		<!-- 日期滑轨容器 -->
+        <div class="m-0" id="dateSliderContainer">			<!-- 日期滑轨 - 支持左右滑动 -->
+			<div class="overflow-x-auto scrollbar-hide" id="dateScrollContainer">
+				<div id="dateContainer" class="flex space-x-2 py-3 px-6 min-w-max transition-transform duration-300">
+					<!-- 初始加载骨架屏 -->
+					<div class="flex space-x-2 animate-pulse" id="dateLoadingSkeleton">
+						<div class="w-12 h-16 bg-gray-200 rounded-[10px]"></div>
+						<div class="w-12 h-16 bg-gray-200 rounded-[10px]"></div>
+						<div class="w-12 h-16 bg-gray-200 rounded-[10px]"></div>
+						<div class="w-12 h-16 bg-gray-200 rounded-[10px]"></div>
+						<div class="w-12 h-16 bg-gray-200 rounded-[10px]"></div>
+						<div class="w-12 h-16 bg-gray-200 rounded-[10px]"></div>
+						<div class="w-12 h-16 bg-gray-200 rounded-[10px]"></div>
+					</div>
+					<!-- 日期会通过JavaScript动态生成 -->
+				</div>
+			</div>
+		</div>
+
+		<script>
+			// 全局变量
+			let courseData = {}; // 课程数据
+			let currentWeek = 0; // 当前周次
+			let selectedDate = null; // 当前选中的日期
+			let animationFrameId = null; // 用于存储动画帧ID，以便可以取消动画
+			// 从localStorage加载保存的开学日期，如果没有则使用默认值
+			let startDate = (() => {
+				const savedStartDate = localStorage.getItem('startDate');
+				if (savedStartDate) {
+					let date = new Date(savedStartDate);
+					// 将开学日期调整为该周的周一
+					const dayOfWeek = date.getDay();
+					const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+					date.setDate(date.getDate() + daysToMonday);
+					return date;
+				}
+				return new Date(2025, 8, 8); // 默认开学日期（2025年9月8日，周一）
+			})();
+			let dates = []; // 所有日期数据
+			let touchStartX = 0;
+			let touchEndX = 0;
+			let lastSwipeTime = 0; // 上次滑动时间，用于防抖
+			
+			// 滑动动画队列管理
+			let animationQueue = []; // 存储待执行的动画任务
+			let isAnimationProcessing = false; // 标记是否有动画正在处理中
+
+			// 从localStorage加载课程数据
+			function loadCourseData() {
+				try {
+					const storedData = localStorage.getItem('courseData');
+					if (storedData) {
+						courseData = JSON.parse(storedData);
+						console.log('从localStorage加载课程数据成功');
+					} else {
+						console.warn('localStorage中没有课程数据');
+						courseData = {};
+					}
+				} catch (error) {
+					console.error('加载课程数据失败:', error);
+					courseData = {};
+				}
+			}
+
+			// 保存课程数据到localStorage
+			function saveCourseData(data) {
+				try {
+					courseData = data;
+					localStorage.setItem('courseData', JSON.stringify(data));
+					console.log('课程数据已保存到localStorage');
+				} catch (error) {
+					console.error('保存课程数据失败:', error);
+				}
+			}
+
+			// 获取指定日期是开学第几周
+			function getWeekNumber(date) {
+				const diffTime = date.getTime() - startDate.getTime();
+				const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+				const weekNumber = Math.floor(diffDays / 7) + 1;
+				console.log('计算周数:', {
+					date: date.toISOString().split('T')[0],
+					startDate: startDate.toISOString().split('T')[0],
+					diffDays: diffDays,
+					weekNumber: weekNumber
+				});
+				return weekNumber;
+			}
+
+			// 获取指定周的开始日期（周一）
+			function getWeekStartDate(weekNumber) {
+				const weekStartDate = new Date(startDate);
+				weekStartDate.setDate(startDate.getDate() + (weekNumber - 1) * 7);
+				console.log('获取周开始日期:', {
+					weekNumber: weekNumber,
+					startDate: startDate.toISOString().split('T')[0],
+					weekStartDate: weekStartDate.toISOString().split('T')[0]
+				});
+				return weekStartDate;
+			}
+
+			// 生成日期数据
+			function generateDates() {
+				dates = [];
+				const today = new Date();
+
+				console.log('开始生成日期数据，开学日期:', startDate.toISOString().split('T')[0]);
+
+				// 生成20周的日期数据
+				for (let week = 1; week <= 20; week++) {
+					const weekStart = getWeekStartDate(week);
+					for (let day = 0; day < 7; day++) {
+						const currentDate = new Date(weekStart);
+						currentDate.setDate(weekStart.getDate() + day);
+
+						const dayOfWeek = currentDate.getDay();
+						const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+						const weekDayText = weekDays[dayOfWeek];
+
+						const isToday = currentDate.getDate() === today.getDate() &&
+							currentDate.getMonth() === today.getMonth() &&
+							currentDate.getFullYear() === today.getFullYear();
+
+						dates.push({
+							date: new Date(currentDate),
+							weekNumber: week,
+							dayOfWeek: dayOfWeek,
+							weekDayText: weekDayText,
+							isToday: isToday,
+							dateString: `${currentDate.getMonth() + 1}/${currentDate.getDate()}`
+						});
+					}
+				}
+
+				console.log('日期数据生成完成，共', dates.length, '天');
+				console.log('第一周第一天:', dates[0].date.toISOString().split('T')[0], '周', dates[0].weekDayText);
+				console.log('第二周第一天:', dates[7].date.toISOString().split('T')[0], '周', dates[7].weekDayText);
+
+				// 设置初始选中日期
+				if (!selectedDate) {
+					const todayDate = dates.find(d => d.isToday);
+					selectedDate = todayDate ? todayDate.date : dates[0].date;
+					currentWeek = getWeekNumber(selectedDate);
+				}
+			}
+
+			// 渲染日期滑轨
+			function renderDateSlider(autoScroll = true) {
+				const dateContainer = document.getElementById('dateContainer');
+				const loadingSkeleton = document.getElementById('dateLoadingSkeleton');
+
+				// 清空容器内容
+				dateContainer.innerHTML = '';
+
+				dates.forEach((dateInfo, index) => {
+					const dateItem = document.createElement('div');
+					let className = 'date-item';
+
+					if (dateInfo.isToday) {
+						className += ' today';
+					}
+
+					if (selectedDate && dateInfo.date.getTime() === selectedDate.getTime()) {
+						className += ' selected';
+					}
+
+					dateItem.className = className;
+					dateItem.setAttribute('data-index', index);
+
+					// 判断是否为该周的周一或周日，如果是则显示周次
+					const isFirstDayOfWeek = dateInfo.dayOfWeek === 1; // 周一
+					const isLastDayOfWeek = dateInfo.dayOfWeek === 0; // 周日
+					const shouldShowWeekNumber = isFirstDayOfWeek || isLastDayOfWeek;
+					const dayDisplay = shouldShowWeekNumber ? `${dateInfo.weekNumber}周` : `周${dateInfo.weekDayText}`;
+					
+					dateItem.innerHTML = `
+                    <span class="date-day">${dayDisplay}</span>
+                    <span class="date-number">${dateInfo.dateString}</span>
+                `;
+
+					// 添加点击事件
+					dateItem.addEventListener('click', () => {
+						selectDate(dateInfo.date);
+					});
+
+					dateContainer.appendChild(dateItem);
+				});
+
+				// 移除加载骨架屏
+				if (loadingSkeleton) {
+					loadingSkeleton.remove();
+				}
+
+				// 滚动到当前选中的日期（仅在需要时）
+				if (autoScroll) {
+					scrollToSelectedDate();
+				}
+			}
+
+			// 滚动到选中的日期
+			function scrollToSelectedDate() {
+				setTimeout(() => {
+					const selectedElement = document.querySelector('.date-item.selected');
+					if (selectedElement) {
+						// 使用自定义的贝塞尔曲线动画效果替代默认的平滑滚动
+						customScrollToElement(selectedElement);
+					}
+				}, 100);
+			}
+
+			// 自定义滚动函数，实现先快后慢的贝塞尔曲线动画效果
+			function customScrollToElement(element) {
+				// 将动画任务添加到队列中
+				animationQueue.push({
+					element: element,
+					timestamp: Date.now()
+				});
+				
+				// 处理动画队列
+				processAnimationQueue();
+			}
+			
+			// 处理动画队列
+			function processAnimationQueue() {
+				// 如果已经有动画在处理中，或者队列为空，则直接返回
+				if (isAnimationProcessing || animationQueue.length === 0) {
+					return;
+				}
+				
+				// 标记正在处理动画
+				isAnimationProcessing = true;
+				
+				// 取出最新的动画任务（忽略旧的任务）
+				const latestTask = animationQueue.pop();
+				
+				// 清空队列中剩余的旧任务
+				animationQueue = [];
+				
+				// 执行最新的动画任务
+				executeScrollAnimation(latestTask.element);
+			}
+			
+			// 执行滚动动画
+			function executeScrollAnimation(element) {
+				const container = document.getElementById('dateScrollContainer');
+				if (!container) {
+					// 动画处理完成
+					isAnimationProcessing = false;
+					return;
+				}
+
+				const containerRect = container.getBoundingClientRect();
+				const elementRect = element.getBoundingClientRect();
+
+				// 计算需要滚动的距离
+				const targetScroll = container.scrollLeft + (elementRect.left - containerRect.left) - (containerRect.width / 2) +
+					(elementRect.width / 2);
+
+				// 获取当前滚动位置
+				const startScroll = container.scrollLeft;
+				const distance = targetScroll - startScroll;
+
+				// 如果距离很短，直接滚动
+				if (Math.abs(distance) < 2) {
+					container.scrollLeft = targetScroll;
+					// 动画处理完成
+					isAnimationProcessing = false;
+					return;
+				}
+
+				// 根据距离动态调整动画持续时间，提高快速滑动的响应性
+				let duration;
+				const absDistance = Math.abs(distance);
+				if (absDistance > 1000) {
+					// 距离很长，使用较长动画时间
+					duration = 1600;
+				} else if (absDistance > 500) {
+					// 距离中等，使用中等动画时间
+					duration = 1200;
+				} else {
+					// 距离较短，使用较短动画时间
+					duration = 800;
+				}
+				
+				const startTime = performance.now();
+
+				// 贝塞尔曲线缓动函数：先快后慢 (easeOutQuart)
+				function easeOutQuart(t) {
+					return 1 - Math.pow(1 - t, 4);
+				}
+
+				// 获取所有日期元素
+				const dateItems = document.querySelectorAll('.date-item');
+				
+				// 判断当前是否为表格视图
+				const isListView = !document.getElementById('listViewContainer').classList.contains('hidden');
+				
+				// 取消之前的动画（如果存在）
+				if (animationFrameId) {
+					cancelAnimationFrame(animationFrameId);
+					animationFrameId = null;
+				}
+				
+				// 动画函数
+				function animate(currentTime) {
+					const elapsed = currentTime - startTime;
+					const progress = Math.min(elapsed / duration, 1);
+
+					// 使用贝塞尔曲线缓动函数计算当前位置
+					const easedProgress = easeOutQuart(progress);
+					const currentScroll = startScroll + (distance * easedProgress);
+
+					container.scrollLeft = currentScroll;
+
+					// 只在表格视图中，在动画结束前400ms标记居中的日期为选中状态
+					if (!isListView && progress >= 0.75) { // 0.75 ≈ (1600-400)/1600
+						// 查找当前居中的日期元素
+						const containerCenter = container.scrollLeft + containerRect.width / 2;
+						let closestElement = null;
+						let minDistance = Infinity;
+						
+						dateItems.forEach(item => {
+							const itemRect = item.getBoundingClientRect();
+							const itemCenter = container.scrollLeft + itemRect.left + itemRect.width / 2;
+							const distanceToCenter = Math.abs(itemCenter - containerCenter);
+							
+							if (distanceToCenter < minDistance) {
+								minDistance = distanceToCenter;
+								closestElement = item;
+							}
+						});
+						
+						// 标记居中的日期为选中状态
+						if (closestElement && !closestElement.classList.contains('temp-selected')) {
+							// 移除其他日期的临时选中状态
+							dateItems.forEach(item => {
+								item.classList.remove('temp-selected');
+							});
+							
+							// 添加临时选中状态到居中的日期
+							closestElement.classList.add('temp-selected');
+						}
+					}
+
+					// 如果动画未完成，继续执行
+					if (progress < 1) {
+						animationFrameId = requestAnimationFrame(animate);
+					} else {
+						// 动画完成后清除动画帧ID
+						animationFrameId = null;
+						// 动画处理完成
+						isAnimationProcessing = false;
+						// 检查是否有新的动画任务需要处理
+						processAnimationQueue();
+					}
+				}
+
+				// 启动动画
+				animationFrameId = requestAnimationFrame(animate);
+			}
+
+			// 滚动到新选中的日期并居中显示
+			function scrollToNewSelectedDate(date) {
+				const dateItems = document.querySelectorAll('.date-item');
+				let targetElement = null;
+				
+				// 格式化日期为 "MM.DD" 格式进行比较
+				const formattedDate = (date.getMonth() + 1) + '.' + date.getDate();
+				
+				// 查找对应的日期元素
+				for (let item of dateItems) {
+					const dateNumberElement = item.querySelector('.date-number');
+					if (dateNumberElement) {
+						const dateText = dateNumberElement.textContent.trim();
+						if (dateText === formattedDate) {
+							targetElement = item;
+							break;
+						}
+					}
+				}
+				
+				// 如果找到目标日期元素，则滚动到该位置并居中
+				if (targetElement) {
+					console.log('Scrolling to date:', formattedDate);
+					customScrollToElement(targetElement); // 使用现有的滚动函数
+				} else {
+					console.log('Date element not found for:', formattedDate);
+					// 如果通过格式化日期找不到，尝试通过日期对象比较
+					const allDateItems = document.querySelectorAll('.date-item');
+					for (let item of allDateItems) {
+						const index = parseInt(item.getAttribute('data-index'));
+						if (index !== null && index !== undefined && dates[index]) {
+							const itemDate = dates[index].date;
+							if (itemDate.getTime() === date.getTime()) {
+								targetElement = item;
+								break;
+							}
+						}
+					}
+					
+					if (targetElement) {
+						console.log('Found date element by date object comparison');
+						customScrollToElement(targetElement);
+					}
+				}
+			}
+
+			// 选择日期
+			function selectDate(date) {
+				// 如果当前是考试视图，需要先返回到课程表视图
+				if (window.isExamView) {
+					returnToScheduleView();
+				}
+				
+				// 取消正在进行的动画
+				if (animationFrameId) {
+					cancelAnimationFrame(animationFrameId);
+					animationFrameId = null;
+				}
+				
+				selectedDate = new Date(date);
+				currentWeek = getWeekNumber(selectedDate);
+
+				// 使用统一的选择逻辑，清除所有上移效果并为新日期添加选中状态
+				showTemporarySelection(selectedDate);
+
+				// 更新课程表显示
+				updateScheduleDisplay();
+				
+				// 确保滑动事件被正确绑定
+				setTimeout(() => {
+					addSwipeEvents();
+				}, 100);
+			}
+
+			// 滑动切换周次
+			function switchToWeek(weekNumber) {
+				if (weekNumber < 1 || weekNumber > 20) return;
+
+				currentWeek = weekNumber;
+
+				renderDateSlider(false); // 不自动滚动到选中日期
+				
+				// 在表格视图切换周次时，使用非线性动画滑动日期滑轨
+				// 找到目标周的第一个日期（周一）元素
+				const weekOneDayElement = document.querySelector(`.date-item:nth-child(${((currentWeek - 1) * 7) + 1})`);
+				if (weekOneDayElement) {
+					// 使用自定义的非线性动画滑动到目标周
+					customScrollToElement(weekOneDayElement);
+				}
+				
+				// 更新课程表显示
+				updateScheduleDisplay();
+			}
+
+			// 添加触摸滑动事件
+			function addSwipeEvents() {
+				const dateScrollContainer = document.getElementById('dateScrollContainer');
+				const listViewContainer = document.getElementById('listViewContainer');
+				const excelViewContainer = document.getElementById('excelViewContainer');
+
+				// 移除之前可能存在的事件监听器，防止重复绑定
+				if (dateScrollContainer) {
+					dateScrollContainer.removeEventListener('touchstart', handleTouchStart);
+					dateScrollContainer.removeEventListener('touchend', handleTouchEnd);
+					dateScrollContainer.removeEventListener('mousedown', handleMouseDown);
+				}
+
+				if (listViewContainer) {
+					listViewContainer.removeEventListener('touchstart', handleTouchStart);
+					listViewContainer.removeEventListener('touchend', handleTouchEnd);
+					listViewContainer.removeEventListener('mousedown', handleMouseDown);
+				}
+
+				if (excelViewContainer) {
+					excelViewContainer.removeEventListener('touchstart', handleTouchStart);
+					excelViewContainer.removeEventListener('touchend', handleTouchEnd);
+					excelViewContainer.removeEventListener('mousedown', handleMouseDown);
+				}
+
+				// 为列表视图添加滑动事件
+				if (listViewContainer) {
+					listViewContainer.addEventListener('touchstart', handleTouchStart);
+					listViewContainer.addEventListener('touchend', handleTouchEnd);
+					listViewContainer.addEventListener('mousedown', handleMouseDown);
+				}
+
+				// 为表格视图添加滑动事件
+				if (excelViewContainer) {
+					excelViewContainer.addEventListener('touchstart', handleTouchStart);
+					excelViewContainer.addEventListener('touchend', handleTouchEnd);
+					excelViewContainer.addEventListener('mousedown', handleMouseDown);
+				}
+			}
+
+			// 移除滑动事件监听器
+			function removeSwipeEvents() {
+				const listViewContainer = document.getElementById('listViewContainer');
+				const excelViewContainer = document.getElementById('excelViewContainer');
+
+				// 移除列表视图的滑动事件
+				if (listViewContainer) {
+					listViewContainer.removeEventListener('touchstart', handleTouchStart);
+					listViewContainer.removeEventListener('touchend', handleTouchEnd);
+					listViewContainer.removeEventListener('mousedown', handleMouseDown);
+				}
+
+				// 移除表格视图的滑动事件
+				if (excelViewContainer) {
+					excelViewContainer.removeEventListener('touchstart', handleTouchStart);
+					excelViewContainer.removeEventListener('touchend', handleTouchEnd);
+					excelViewContainer.removeEventListener('mousedown', handleMouseDown);
+				}
+			}
+
+			// 处理触摸开始事件
+			function handleTouchStart(e) {
+				console.log('Touch start event triggered');
+				// 不清除已选中日期的上移效果，只在需要时清除临时选中状态
+				document.querySelectorAll('.date-item.temp-selected').forEach(item => {
+					item.style.transform = ''; // 只清除临时选中状态
+					item.classList.remove('temp-selected');
+				});
+				
+				// 取消正在进行的动画
+				if (animationFrameId) {
+					cancelAnimationFrame(animationFrameId);
+					animationFrameId = null;
+				}
+				
+				// 清空动画队列
+				animationQueue = [];
+				isAnimationProcessing = false;
+				
+				touchStartX = e.touches[0].clientX;
+				touchStartY = e.touches[0].clientY; // 记录起始Y坐标
+			}
+
+			// 处理触摸结束事件
+			function handleTouchEnd(e) {
+				console.log('Touch end event triggered');
+				touchEndX = e.changedTouches[0].clientX;
+				touchEndY = e.changedTouches[0].clientY; // 记录结束Y坐标
+				handleSwipe(e);
+			}
+
+			// 处理鼠标按下事件
+			function handleMouseDown(e) {
+				console.log('Mouse down event triggered');
+				// 不清除已选中日期的上移效果，只在需要时清除临时选中状态
+				document.querySelectorAll('.date-item.temp-selected').forEach(item => {
+					item.style.transform = ''; // 只清除临时选中状态
+					item.classList.remove('temp-selected');
+				});
+				
+				// 取消正在进行的动画
+				if (animationFrameId) {
+					cancelAnimationFrame(animationFrameId);
+					animationFrameId = null;
+				}
+				
+				// 清空动画队列
+				animationQueue = [];
+				isAnimationProcessing = false;
+				
+				touchStartX = e.clientX;
+				touchStartY = e.clientY; // 记录起始Y坐标
+				// 添加鼠标移动和释放事件监听器
+				document.addEventListener('mousemove', handleMouseMove);
+				document.addEventListener('mouseup', handleMouseUp);
+			}
+
+			// 处理鼠标移动事件
+			function handleMouseMove(e) {
+				// 在鼠标拖动过程中不执行任何操作，只记录最终位置
+				touchEndX = e.clientX;
+				touchEndY = e.clientY; // 记录结束Y坐标
+			}
+
+			// 处理鼠标释放事件
+			function handleMouseUp(e) {
+				console.log('Mouse up event triggered');
+				// 移除事件监听器
+				document.removeEventListener('mousemove', handleMouseMove);
+				document.removeEventListener('mouseup', handleMouseUp);
+
+				// 调用滑动处理函数
+				handleSwipe(e);
+			}
+
+			// 处理滑动
+			function handleSwipe(e) {
+				console.log('Handle swipe function called');
+				// 阻止事件冒泡
+				if (e) {
+					e.stopPropagation();
+				}
+
+				const swipeThreshold = 30; // 降低滑动阈值，提高灵敏度
+				const diffX = touchEndX - touchStartX; // 水平滑动距离
+				const diffY = touchEndY - touchStartY; // 垂直滑动距离
+				console.log('Swipe diff X:', diffX, 'Swipe diff Y:', diffY);
+
+				// 防抖处理：优化快速连续滑动的处理
+				const now = Date.now();
+				const timeDiff = now - lastSwipeTime;
+				
+				// 根据滑动速度动态调整防抖时间，提高快速滑动的响应性
+				const swipeSpeed = Math.abs(diffX) / timeDiff; // 像素/ms
+				let debounceThreshold;
+				
+				if (swipeSpeed > 1.0) {
+					// 高速滑动，极短防抖时间
+					debounceThreshold = 50;
+				} else if (swipeSpeed > 0.5) {
+					// 中速滑动，较短防抖时间
+					debounceThreshold = 100;
+				} else {
+					// 低速滑动，正常防抖时间
+					debounceThreshold = 200;
+				}
+				
+				if (timeDiff < debounceThreshold) {
+					console.log('Swipe blocked by debounce, time diff:', timeDiff, 'threshold:', debounceThreshold);
+					return;
+				}
+				lastSwipeTime = now;
+
+				// 判断是水平滑动还是垂直滑动（水平滑动优先）
+				if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > swipeThreshold) {
+					console.log('Horizontal swipe detected');
+					
+					// 检查是否在考试信息视图或成绩信息视图中
+					if (window.isExamView || window.isGradeView) {
+						// 在考试信息视图中，左右滑动切换到成绩信息视图
+						if (window.isExamView) {
+							console.log('Swiping from exam view to grade view');
+							showGradeInfo();
+							return;
+						}
+						
+						// 在成绩信息视图中，左右滑动切换到考试信息视图
+						if (window.isGradeView) {
+							console.log('Swiping from grade view to exam view');
+							showExamInfo();
+							return;
+						}
+					}
+					
+					// 判断当前是列表视图还是表格视图
+					const isListView = !document.getElementById('listViewContainer').classList.contains('hidden');
+					console.log('Is list view:', isListView);
+
+					if (isListView) {
+						// 列表视图：左右滑动切换日期
+						// 右滑动(-1)是前一天，左滑动(1)是后一天（符合用户习惯）
+						const direction = diffX > 0 ? -1 : 1;
+						console.log('Switching date with direction:', direction);
+						switchToDate(direction);
+					} else {
+						// 表格视图：左右滑动切换周次
+						// 右滑动(-1)是上周，左滑动(1)是下周（符合用户习惯）
+						const direction = diffX > 0 ? -1 : 1;
+						const newWeek = currentWeek + direction;
+						console.log('Switching week to:', newWeek);
+
+						// 限制周数在有效范围内（1-20周）
+						if (newWeek >= 1 && newWeek <= 20) {
+							switchToWeek(newWeek);
+						}
+					}
+				} else if (Math.abs(diffY) > swipeThreshold) {
+					console.log('Vertical swipe detected - scrolling only');
+					// 垂直滑动只用于滚动，不触发周次切换
+					// 这里不需要做任何事情，浏览器会自动处理滚动
+				} else {
+					console.log('Swipe threshold not met');
+				}
+			}
+
+			// 切换到前一天或后一天（用于列表视图）
+			function switchToDate(direction) {
+				console.log('Switch to date called with direction:', direction);
+				if (!selectedDate) return;
+
+				// 创建新的日期对象
+				const newDate = new Date(selectedDate);
+
+				// 根据方向调整日期
+				newDate.setDate(newDate.getDate() + direction);
+				console.log('New date:', newDate);
+
+				// 检查新日期是否在有效范围内（开学日期到第20周结束）
+				const endDate = new Date(startDate);
+				endDate.setDate(startDate.getDate() + 20 * 7 - 1); // 第20周的最后一天
+				console.log('Start date:', startDate);
+				console.log('End date:', endDate);
+
+				if (newDate >= startDate && newDate <= endDate) {
+					console.log('Date is within range, selecting date');
+					
+					// 只清除临时选中状态，保留真正的选定状态
+					document.querySelectorAll('.date-item.temp-selected').forEach(item => {
+						item.style.transform = ''; // 清除临时选中状态
+						item.classList.remove('temp-selected');
+					});
+					
+					// 添加滑动过程中的选中效果，保持持续状态
+					showTemporarySelection(newDate);
+					
+					// 更新课程数据，但不恢复上移效果
+					selectedDate = newDate;
+					currentWeek = getWeekNumber(selectedDate);
+					updateScheduleDisplay();
+					
+					// 同时开始滑轨滚动，确保与日期上移动画同步启动
+					// 使用智能防抖优化，根据滑动频率调整延迟时间
+					if (switchToDate.debounceTimer) {
+						clearTimeout(switchToDate.debounceTimer);
+					}
+					
+					// 根据滑动频率动态调整延迟时间，提高快速滑动的流畅性
+					const now = Date.now();
+					const timeSinceLastSwipe = now - lastSwipeTime;
+					let scrollDelay;
+					
+					if (timeSinceLastSwipe < 100) {
+						// 快速连续滑动，缩短延迟时间
+						scrollDelay = 20;
+					} else if (timeSinceLastSwipe < 200) {
+						// 中等速度滑动，适中延迟时间
+						scrollDelay = 35;
+					} else {
+						// 慢速滑动，较长延迟时间
+						scrollDelay = 50;
+					}
+					
+					// 延迟执行滚动，给用户更流畅的感觉
+					switchToDate.debounceTimer = setTimeout(() => {
+						scrollToNewSelectedDate(newDate);
+						switchToDate.debounceTimer = null;
+					}, scrollDelay);
+				} else {
+					console.log('Date is out of range');
+				}
+			}
+			
+			// 显示选中状态并保持持续的上移效果
+			function showTemporarySelection(tempDate) {
+				// 移除所有现有的选中状态和上移效果，为新日期让路
+				document.querySelectorAll('.date-item').forEach(item => {
+					item.classList.remove('selected', 'temp-selected');
+					item.style.transform = ''; // 清除上移效果，为新日期让路
+				});
+				
+				// 为目标日期添加选中状态和持续的上移效果
+				const tempIndex = dates.findIndex(d => d.date.getTime() === tempDate.getTime());
+				if (tempIndex >= 0) {
+					const tempElement = document.querySelector(`[data-index="${tempIndex}"]`);
+					if (tempElement) {
+						tempElement.classList.add('selected');
+						// 添加持续的上移效果
+						tempElement.style.transform = 'translateY(-15px)';
+						tempElement.style.transition = 'all 0.5s ease';
+					}
+				}
+			}
+
+			// 初始化
+			function init() {
+				// 初始化当前日期和周次
+				currentDate = new Date();
+				currentWeek = getWeekNumber(currentDate);
+
+				// 渲染日期滑轨
+				renderDateSlider(true); // 自动滚动到选中日期
+
+				// 添加触摸滑动事件
+				addSwipeEvents();
+
+				// 更新课程表显示
+				updateScheduleDisplay();
+			}
+
+			// 更新课程表显示
+			function updateScheduleDisplay() {
+				const listViewContainer = document.getElementById('listViewContainer');
+				const excelViewContainer = document.getElementById('excelViewContainer');
+
+				// 清空容器
+				listViewContainer.innerHTML = '';
+				excelViewContainer.innerHTML = '';
+
+				// 获取当前周的课程数据
+				const currentWeekData = courseData[currentWeek.toString()];
+
+				// 判断当前是列表视图还是表格视图
+				const isListView = !listViewContainer.classList.contains('hidden');
+
+				if (currentWeekData) {
+					if (isListView) {
+						// 列表视图：显示课程列表
+						currentWeekData.forEach(course => {
+							const courseItem = document.createElement('div');
+							courseItem.className = 'course-item';
+							courseItem.innerHTML = `
+								<div class="course-time">${course.time}</div>
+								<div class="course-name">${course.name}</div>
+								<div class="course-room">${course.room}</div>
+							`;
+
+							listViewContainer.appendChild(courseItem);
+						});
+					} else {
+						// 表格视图：显示课程表格
+						const table = document.createElement('table');
+						const headerRow = document.createElement('tr');
+
+						// 添加表头
+						const headerCells = ['时间', '课程名称', '教室'];
+						headerCells.forEach(headerText => {
+							const headerCell = document.createElement('th');
+							headerCell.textContent = headerText;
+							headerRow.appendChild(headerCell);
+						});
+
+						table.appendChild(headerRow);
+
+						// 添加课程行
+						currentWeekData.forEach(course => {
+							const row = document.createElement('tr');
+
+							const timeCell = document.createElement('td');
+							timeCell.textContent = course.time;
+							row.appendChild(timeCell);
+
+							const nameCell = document.createElement('td');
+							nameCell.textContent = course.name;
+							row.appendChild(nameCell);
+
+							const roomCell = document.createElement('td');
+							roomCell.textContent = course.room;
+							row.appendChild(roomCell);
+
+							table.appendChild(row);
+						});
+
+						excelViewContainer.appendChild(table);
+					}
+				} else {
+					// 如果没有课程数据，确保容器仍然可以响应滑动事件
+					if (isListView) {
+						listViewContainer.innerHTML =
+							'<div class="no-courses-message" style="text-align: center; padding: 20px; color: #666;">这一天没有课程安排</div>';
+					} else {
+						excelViewContainer.innerHTML =
+							'<div class="no-courses-message" style="text-align: center; padding: 20px; color: #666;">这一周没有课程安排</div>';
+					}
+				}
+			}
+
+			// 切换视图
+			function toggleView() {
+				// 如果当前是考试信息视图，不允许切换
+				if (window.isExamView) {
+					return;
+				}
+				
+				const listViewContainer = document.getElementById('listViewContainer');
+				const excelViewContainer = document.getElementById('excelViewContainer');
+
+				if (listViewContainer.classList.contains('hidden')) {
+					listViewContainer.classList.remove('hidden');
+					excelViewContainer.classList.add('hidden');
+				} else {
+					listViewContainer.classList.add('hidden');
+					excelViewContainer.classList.remove('hidden');
+				}
+
+				// 更新课程表显示
+				updateScheduleDisplay();
+				
+				// 重新绑定滑动事件，确保切换视图后滑动功能正常
+				setTimeout(() => {
+					addSwipeEvents();
+				}, 100);
+			}
+			
+			// 返回课程表视图（从考试信息视图返回）
+			function returnToScheduleView() {
+				// 重置考试视图和成绩视图标志
+				window.isExamView = false;
+				window.isGradeView = false;
+				
+				const listViewContainer = document.getElementById('listViewContainer');
+				const excelViewContainer = document.getElementById('excelViewContainer');
+				
+				// 切换到表格视图
+				listViewContainer.classList.add('hidden');
+				excelViewContainer.classList.remove('hidden');
+				
+				// 更新视图切换按钮文本
+				const viewToggleBtn = document.getElementById('viewToggleBtn');
+				if (viewToggleBtn) {
+					viewToggleBtn.innerHTML = '<i class="fa-solid fa-list"></i><span>列表</span>';
+				}
+				
+				// 更新课程表显示
+				updateScheduleDisplay();
+				
+				// 重新绑定滑动事件
+				setTimeout(() => {
+					addSwipeEvents();
+				}, 100);
+			}
+
+			function getCourseCategory(courseName) {
+				// 使用更稳定的哈希算法，确保分布均匀
+				let hash = 0;
+				const len = courseName.length;
+
+				if (len === 0) return 'color1';
+
+				// 改进哈希算法：使用DJB2变种，减少冲突并提升分布均匀性
+				for (let i = 0; i < len; i++) {
+					const charCode = courseName.charCodeAt(i);
+					// 更平缓的哈希增长，避免极端值导致取余偏差
+					hash = ((hash << 7) ^ charCode) + (hash >> 3);
+					hash = hash & hash; // 保持32位整数特性，避免溢出异常
+				}
+
+				// 最终哈希值归一化处理：通过两次取余确保分布更均匀
+				const positiveHash = (hash >>> 0); // 无符号32位整数
+				// 先对一个较大的质数取余，再对5取余，减少分布偏差
+				const normalized = (positiveHash % 9973) % 5;
+				const colorIndex = normalized + 1; // 确保生成 1-5 的索引
+
+				return `color${colorIndex}`;
+			}
+
+
+
+			// 定义节次与时间的映射关系
+			const timeMap = [{
+					classNumber: 1,
+					startTime: "08:20",
+					endTime: "09:05"
+				},
+				{
+					classNumber: 2,
+					startTime: "09:15",
+					endTime: "10:00"
+				},
+				{
+					classNumber: 3,
+					startTime: "10:20",
+					endTime: "11:05"
+				},
+				{
+					classNumber: 4,
+					startTime: "11:15",
+					endTime: "12:00"
+				},
+				{
+					classNumber: 5,
+					startTime: "12:30",
+					endTime: "13:15"
+				},
+				{
+					classNumber: 6,
+					startTime: "13:15",
+					endTime: "14:00"
+				},
+				{
+					classNumber: 7,
+					startTime: "14:10",
+					endTime: "14:55"
+				},
+				{
+					classNumber: 8,
+					startTime: "15:05",
+					endTime: "15:50"
+				},
+				{
+					classNumber: 9,
+					startTime: "16:00",
+					endTime: "16:45"
+				},
+				{
+					classNumber: 10,
+					startTime: "16:45",
+					endTime: "17:30"
+				},
+				{
+					classNumber: 11,
+					startTime: "19:00",
+					endTime: "19:45"
+				},
+				{
+					classNumber: 12,
+					startTime: "19:45",
+					endTime: "20:30"
+				},
+				{
+					classNumber: 13,
+					startTime: "20:30",
+					endTime: "21:15"
+				}
+			];
+
+			// 根据节次获取对应的时间
+			function getTimeByClassNumber(classNumber) {
+				const timeInfo = timeMap.find(item => item.classNumber === classNumber);
+				return timeInfo ? `${timeInfo.startTime}-${timeInfo.endTime}` : '';
+			}
+
+			// 根据节次范围获取对应的时间范围
+			function getTimeRangeByTimeSlots(timeSlots) {
+				if (!timeSlots || timeSlots.length === 0) return '';
+
+				const parsedSlots = parseTimeSlots(timeSlots);
+				if (parsedSlots.length === 0) return timeSlots;
+
+				const firstSlot = parsedSlots[0];
+				const lastSlot = parsedSlots[parsedSlots.length - 1];
+
+				const firstTimeInfo = timeMap.find(item => item.classNumber === firstSlot);
+				const lastTimeInfo = timeMap.find(item => item.classNumber === lastSlot);
+
+				if (firstTimeInfo && lastTimeInfo) {
+					return `${firstTimeInfo.startTime}-${lastTimeInfo.endTime}`;
+				}
+				return timeSlots;
+			}
+
+			// 解析节次范围（例如："1-2" -> [1, 2]）
+			function parseTimeSlots(timeSlot) {
+				const parts = timeSlot.split('-');
+				if (parts.length === 2) {
+					const start = parseInt(parts[0]);
+					const end = parseInt(parts[1]);
+					const slots = [];
+					for (let i = start; i <= end; i++) {
+						slots.push(i);
+					}
+					return slots;
+				} else if (parts.length === 1) {
+					return [parseInt(parts[0])];
+				}
+				return [];
+			}
+
+			// 获取星期几的索引（周一=0, 周二=1, ..., 周日=6）
+			function getWeekdayIndex(weekday) {
+				const weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+				return weekdays.indexOf(weekday);
+			}
+
+			// 更新课程表显示
+			function updateScheduleDisplay() {
+				updateListView();
+				updateTableView();
+			}
+
+			// 更新列表视图
+			function updateListView() {
+				const listContainer = document.querySelector('#listViewContainer section');
+				if (!listContainer) return;
+
+				const weekData = courseData[currentWeek.toString()];
+				if (!weekData || weekData.length === 0) {
+					const selectedDateStr = selectedDate ? `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日` : '';
+					listContainer.innerHTML = `
+                    <div class="text-center text-gray-200 py-2">
+                        <p>暂无课表</p>
+                    </div>
+                `;
+					return;
+				}
+
+				// 在列表视图下，只显示选中日期的课程
+				const selectedDayOfWeek = selectedDate ? selectedDate.getDay() : 1;
+				const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+				const selectedWeekday = weekDays[selectedDayOfWeek];
+
+				// 筛选当日课程
+				const todayCourses = weekData.filter(course => course['星期'] === selectedWeekday);
+
+				const selectedDateStr = selectedDate ? `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日` : '';
+				let htmlContent = `<h2 class="text-2xl font-semibold mb-3 text-center text-white"></h2>`;
+
+				if (todayCourses.length === 0) {
+					htmlContent += `
+                    <div class="text-center text-gray-500 py-8">
+                    </div>
+                `;
+				} else {
+					// 按时间排序课程
+					const sortedCourses = [...todayCourses].sort((a, b) => {
+						const timeA = parseTimeSlots(a['节次'])[0] || 0;
+						const timeB = parseTimeSlots(b['节次'])[0] || 0;
+						return timeA - timeB;
+					});
+
+					sortedCourses.forEach((course, index) => {
+						const category = getCourseCategory(course['课程名称']);
+
+						const courseTime = getTimeRangeByTimeSlots(course['节次']);
+
+						// 获取保存的字体大小设置
+						const savedCourseNameFontSize = localStorage.getItem('courseNameFontSize') || '16';
+						const savedLocationTextFontSize = localStorage.getItem('locationTextFontSize') || '16';
+						const courseCard = `
+                        <div class="course-card bg-course-${category} text-white border-l-4 border-course-${category}/80 relative overflow-hidden cursor-pointer"
+                            data-course='${JSON.stringify({
+                        name: course['课程名称'],
+                        time: courseTime,
+                        teacher: course['教师'],
+                        location: course['场地'],
+                        weekday: course['星期'],
+                        category: category
+                    })}'>
+                            <div class="absolute inset-0 bg-gradient-to-r from-course-${category} to-course-${category}/80"></div>
+                            <div class="relative z-10">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div class="flex items-center max-w-[100%] overflow-hidden">
+                                        <h3 class="font-semibold text-wrap" style="font-size: ${savedCourseNameFontSize}px; font-family: Cursive, Brush Script MT;">${course['课程名称']}</h3>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <span class="text-base font-medium whitespace-nowrap">${courseTime}</span>
+                                    </div>
+                                </div>
+                                <div class="flex flex-wrap justify-between items-end gap-2 text-sm text-white/90 mb-3">
+                                    <div class="flex items-center">
+                                         <span>${course['教师']}</span>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                        <span class="font-semibold" style="font-size: ${savedLocationTextFontSize}px;">${course['场地']}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+						htmlContent += courseCard;
+
+						// 在中午和晚上添加休息时间分隔
+						const currentTimeSlot = parseTimeSlots(course['节次'])[0] || 0;
+						const nextCourse = sortedCourses[index + 1];
+						if (nextCourse) {
+							const nextTimeSlot = parseTimeSlots(nextCourse['节次'])[0] || 0;
+
+							if (currentTimeSlot <= 4 && nextTimeSlot >= 7) {
+								htmlContent += `
+                                <div class="flex items-center justify-center my-3 py-0.1">
+                                    <div class="w-32 h-px bg-neutral-200"></div>
+                                    <div class="mx-3 text-white/80 text-sm flex items-center whitespace-nowrap">
+                                        <i class="fa-solid fa-bed mr-1"></i>
+                                        睡个午觉吧
+                                    </div>
+                                    <div class="w-32 h-px bg-neutral-200"></div>
+                                </div>
+                            `;
+							} else if ((currentTimeSlot <= 8 && nextTimeSlot >= 11) || nextTimeSlot === 11) {
+								htmlContent += `
+                                <div class="flex items-center justify-center my-3 py-0.1">
+                                    <div class="w-32 h-px bg-neutral-200"></div>
+                                    <div class="mx-3 text-white/80 text-sm flex items-center whitespace-nowrap">
+                                        <i class="fa-solid fa-bowl-rice mr-1"></i>
+                                        吃个晚饭吧
+                                    </div>
+                                    <div class="w-32 h-px bg-neutral-200"></div>
+                                </div>
+                            `;
+							}
+						}
+					});
+				}
+
+				listContainer.innerHTML = htmlContent;
+
+				// 重新绑定事件
+				bindCourseClickEvents();
+				
+				// 同步字体大小设置
+				syncCourseNameFontSize();
+				syncLocationTextFontSize();
+			}
+
+			// 更新表格视图
+			function updateTableView() {
+				const tableBody = document.querySelector('#excelView tbody');
+				if (!tableBody) return;
+
+				// 清空表格内容
+				tableBody.innerHTML = '';
+
+				// 获取当前周的课程数据
+				const weekData = courseData[currentWeek.toString()];
+
+				// 创建课程表数据结构 [dayIndex][timeSlot] = course
+				const schedule = {};
+				const courseSpans = {}; // 记录课程跨越的节次
+
+				for (let day = 0; day < 7; day++) {
+					schedule[day] = {};
+					courseSpans[day] = {};
+				}
+
+				// 填充课程数据
+				if (weekData && weekData.length > 0) {
+					weekData.forEach(course => {
+						const dayIndex = getWeekdayIndex(course['星期']);
+						const timeSlots = parseTimeSlots(course['节次']);
+
+						if (dayIndex >= 0 && dayIndex < 7 && timeSlots.length > 0) {
+							const startSlot = timeSlots[0];
+							const spanCount = timeSlots.length;
+
+							// 只在第一个节次存储课程信息
+							schedule[dayIndex][startSlot] = course;
+							courseSpans[dayIndex][startSlot] = spanCount;
+
+							// 在后续节次标记为已占用
+							for (let i = 1; i < spanCount; i++) {
+								schedule[dayIndex][timeSlots[i]] = 'occupied';
+							}
+						}
+					});
+				}
+
+				// 定义时间段：上午(1-2, 3-4)，下午(7-8, 9-10)，晚上(11-12)
+				const timeSegments = [{
+						name: '上午',
+						slots: [
+							[1, 2],
+							[3, 4]
+						],
+						label: '上午时段'
+					},
+					{
+						name: '下午',
+						slots: [
+							[7, 8],
+							[9, 10]
+						],
+						label: '下午时段'
+					},
+					{
+						name: '晚上',
+						slots: [
+							[11, 12]
+						],
+						label: '晚自习'
+					}
+				];
+
+				timeSegments.forEach((segment, segmentIndex) => {
+					segment.slots.forEach((slotPair, pairIndex) => {
+						const row = document.createElement('tr');
+						row.className = '';
+						row.style.height = '80px'; // 增加行高
+
+						// 添加周一到周日的单元格
+						for (let day = 0; day < 7; day++) {
+							const cell = document.createElement('td');
+							cell.className = 'py-1 px-0.5 align-top';
+							cell.style.width = '14.285%';
+							cell.style.minWidth = '80px';
+							cell.style.maxWidth = '80px';
+
+							// 检查这个时间段是否有课程
+							let courseFound = false;
+							let courseToShow = null;
+							let rowSpan = 1;
+
+							// 检查第一个节次
+							const firstSlot = slotPair[0];
+							if (schedule[day][firstSlot] && schedule[day][firstSlot] !== 'occupied') {
+								courseToShow = schedule[day][firstSlot];
+								rowSpan = courseSpans[day][firstSlot] || 1;
+								courseFound = true;
+							}
+
+							if (courseFound) {
+								const category = getCourseCategory(courseToShow['课程名称']);
+
+								// 如果课程跨越多个时间段，设置rowspan
+								if (rowSpan > 2) {
+									cell.setAttribute('rowspan', '2'); // 跨时间段
+								}
+
+								const courseTime = getTimeRangeByTimeSlots(courseToShow['节次']);
+
+								// 获取保存的字体大小设置并调整表格视图的显示大小
+								const savedCourseNameFontSize = localStorage.getItem('courseNameFontSize') || '16';
+								const savedLocationTextFontSize = localStorage.getItem('locationTextFontSize') || '16';
+								const tableCourseFontSize = parseInt(savedCourseNameFontSize) - 6;
+								const tableLocationFontSize = parseInt(savedLocationTextFontSize) - 6;
+								cell.innerHTML = `
+                                <div class="course-cell bg-course-${category} text-white text-center p-0 rounded-[16px] flex flex-col justify-center relative cursor-pointer"
+                                    style="height: ${rowSpan > 2 ? '328px' : '160px'}"
+                                    data-course='${JSON.stringify({ 
+                                name: courseToShow['课程名称'],
+                                time: courseTime,
+                                teacher: courseToShow['教师'],
+                                location: courseToShow['场地'],
+                                weekday: courseToShow['星期'],
+                                category: category
+                            })}'>
+                                    <div class="font-medium" style="font-size: ${tableCourseFontSize}px; font-family: Cursive, Brush Script MT;">${courseToShow['课程名称']}</div>
+                                    <div class="mt-1 opacity-80" style="font-size: ${tableLocationFontSize}px;">${courseToShow['场地']}</div>
+                                </div>
+                            `;
+							} else {
+								cell.innerHTML = '<div class="course-cell empty rounded-[16px]"></div>';
+							}
+
+							row.appendChild(cell);
+						}
+
+						tableBody.appendChild(row);
+					});
+
+					// 在时间段之间添加休息时间标识
+					if (segmentIndex < timeSegments.length - 1) {
+						const breakRow = document.createElement('tr');
+						breakRow.className = 'h-10';
+						// 增加行高从40px到60px
+						breakRow.style.height = '10px';
+
+						let breakText = '';
+						let breakIcon = '';
+						
+						if (segmentIndex === 0) {
+							breakText = '睡个午觉吧';
+							breakIcon = '<i class="fa-solid fa-bed mr-1"></i>';
+						} else if (segmentIndex === 1) {
+							breakText = '吃个晚饭吧';
+							breakIcon = '<i class="fa-solid fa-bowl-rice mr-1"></i>';
+						}
+
+						breakRow.innerHTML = `
+		<td colspan="7" class="py-2 px-1 text-center" style="position: relative;">
+<div class="inline-flex items-center justify-center px-8 py-3 rounded-[10px] text-xs text-white/60 font-medium whitespace-nowrap" 
+     style="border: 1px solid rgba(255, 255, 255, 0); /* 边框透明度从0.1降至0.05 */
+            width: 100%; 
+            max-width: 500px; 
+            height: 100%;">
+			${breakIcon}${breakText}
+			</div>
+		</td>
+	`;
+						tableBody.appendChild(breakRow);
+				}
+			});
+			
+			// 同步字体大小设置
+			syncCourseNameFontSize();
+			syncLocationTextFontSize();
+			
+			// 重新绑定课程点击事件
+			bindCourseClickEvents();
+		}
+
+
+			// 导入状态变量
+			let hasImportedSuccessfully = false; // 是否已经成功导入过数据
+
+			// 控制灵动岛展开收起的函数 - 实现苹果风格的分阶段精细动画
+			// 确保胶囊内信息只在动画触发时才显示
+			let islandAnimationTimers = []; // 用于跟踪和清除动画定时器
+			let selectedFile = null; // 存储选择的文件
+			let fileContent = null; // 存储文件内容
+			let currentMode = 'default'; // 当前模式：'import' 或 'default'
+
+
+			function toggleIslandExpand(mode = 'default') {
+				// 清除所有之前的定时器，防止状态冲突和残影
+				clearAllIslandTimers();
+
+				const islandContainer = document.getElementById('islandContainer');
+				const islandContent = document.getElementById('islandContent');
+				const islandDefaultIcon = document.getElementById('islandDefaultIcon');
+				const navButtonsContainer = document.getElementById('navButtonsContainer');
+
+				// 防抖保护：不带参数的调用仅用于“关闭”，禁止在未展开时触发展开
+				if (arguments.length === 0) {
+					if (islandContainer && islandContainer.classList.contains('expanded')) {
+						mode = 'close';
+					} else {
+						return; // 未展开且无显式模式时不执行，避免页面加载后误触发展开
+					}
+				}
+
+				// 如果是关闭操作，重置当前模式为默认
+				if (mode === 'close') {
+					currentMode = 'default';
+				}
+
+				// 设置当前模式
+				if (mode !== 'close') {
+					currentMode = mode;
+					console.log('设置当前模式为:', currentMode);
+				}
+
+				// 切换展开状态类
+				const isExpanded = mode === 'close' ? false : islandContainer.classList.toggle('expanded');
+
+				// 移除所有可能的动画阶段类和内容显示类
+				islandContainer.classList.remove('phase1', 'phase2', 'phase3');
+
+				if (isExpanded) {
+					// 展开动画 - 分三个阶段
+					// 阶段1: 快速响应（增强用户点击反馈）
+					let timer1 = setTimeout(() => {
+						islandContainer.classList.add('phase1');
+
+						// 阶段2: 主体形变（主要尺寸变化） - 调整延迟更符合苹果灵动岛风格
+						let timer2 = setTimeout(() => {
+							islandContainer.classList.remove('phase1');
+							islandContainer.classList.add('phase2');
+
+							// 按钮容器渐隐，按钮变为不可点击
+							if (navButtonsContainer) {
+								navButtonsContainer.style.opacity = '0';
+								// 禁用所有按钮
+								const buttons = navButtonsContainer.querySelectorAll('button');
+								buttons.forEach(button => {
+									button.disabled = true;
+								});
+							}
+
+							// 阶段3: 减速稳定（最终形态调整） - 优化时间延迟
+							let timer3 = setTimeout(() => {
+								islandContainer.classList.remove('phase2');
+								islandContainer.classList.add('phase3');
+
+								// 根据模式显示不同内容
+								if (currentMode === 'import') {
+									console.log('当前是导入模式，显示上传区域');
+									// 导入模式：显示上传区域
+									islandContent.classList.add('expanded-content');
+									islandDefaultIcon.style.display = 'none'; // 隐藏默认图标
+
+									// 创建上传区域内容
+									const uploadArea = document.getElementById('islandUploadArea');
+									if (uploadArea) {
+										uploadArea.style.display = 'flex';
+										uploadArea.style.alignItems = 'center';
+										uploadArea.style.justifyContent = 'center';
+										uploadArea.style.width = '100%';
+										uploadArea.style.height = '100%';
+
+										// 创建包含两个图标的容器
+										uploadArea.innerHTML = `
+                                <div style="position: relative; display: flex; gap: 2rem; align-items: center; justify-content: center;">
+                                    <!-- 视频上传图标和可点击区域 -->
+                                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                                        <div id="videoUploadClickArea" 
+                                             style="position: absolute; 
+                                                    width: 8rem; 
+                                                    height: 8rem; 
+                                                    cursor: pointer; 
+                                                    z-index: 10000;">
+                                        </div>
+                                        <i class="fa-solid fa-clapperboard text-blue-500" style="font-size: 8rem;"></i>
+                                        <span style="color: white; font-size: 1.2rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">导入视频</span>
+                                    </div>
+                                    
+                                    <!-- 文件上传图标和可点击区域 -->
+                                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                                        <div id="fileUploadClickArea" 
+                                             style="position: absolute; 
+                                                    width: 8rem; 
+                                                    height: 8rem; 
+                                                    cursor: pointer; 
+                                                    z-index: 10000;">
+                                        </div>
+                                        <i class="fa-solid fa-folder text-green-500" style="font-size: 8rem;"></i>
+                                        <span style="color: white; font-size: 1.2rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">导入课程</span>
+                                    </div>
+                                </div>
+                            `;
+
+										// 添加视频上传点击事件
+										const videoUploadClickArea = document.getElementById(
+											'videoUploadClickArea');
+										if (videoUploadClickArea) {
+											videoUploadClickArea.addEventListener('click', function(e) {
+												e.stopPropagation();
+												console.log('视频上传图标被点击，触发视频选择逻辑');
+
+												// 环境判断：5+App环境
+												if (window.plus && plus.gallery) {
+													console.log('5+环境可用，准备打开视频选择器');
+													plus.gallery.pick(function(path) {
+														// 检查文件类型
+														const fileName = path.split('/')
+															.pop().toLowerCase();
+														const validFormats = ['.mp4',
+															'.avi', '.mov', '.wmv',
+															'.flv', '.mkv'
+														];
+														const isVideo = validFormats
+															.some(format => fileName
+																.endsWith(format));
+
+														if (isVideo) {
+															// 视频文件处理
+															console.log('选择了视频文件:',
+																path);
+															const STORAGE_KEY =
+																'saved_video_background_path';
+															// 保存视频路径
+															plus.storage.setItem(
+																STORAGE_KEY, path);
+															localStorage.setItem(
+																STORAGE_KEY, path);
+															// 设置视频背景
+															const localUrl = plus.io
+																.convertLocalFileSystemURL(
+																	path);
+															const bgVideo = document
+																.querySelector(
+																	'.bg-video');
+															const bgImage = document
+																.querySelector(
+																	'.bg-image');
+															if (bgVideo) {
+																// 显示视频元素，隐藏图片元素
+																bgVideo.style.display = 'block';
+																if (bgImage) {
+																	bgImage.style.display = 'none';
+																}
+																bgVideo.pause();
+																bgVideo.src = localUrl;
+																bgVideo.load();
+																bgVideo.play().catch(
+																	() => {
+																		// 播放失败时清除无效记录，恢复图片背景
+																		plus.storage
+																			.removeItem(
+																				STORAGE_KEY
+																			);
+																		bgVideo.style.display = 'none';
+																		if (bgImage) {
+																			bgImage.style.display = 'block';
+																		}
+																	});
+															}
+
+															// 选择完成后自动关闭灵动岛
+															setTimeout(() => {
+																toggleIslandExpand
+																	();
+															}, 500);
+														} else {
+															console.log(
+																'选择的文件不是有效的视频格式');
+															// 显示格式错误提示
+															if (window.plus && plus
+																.nativeUI) {
+																plus.nativeUI.toast(
+																	'请选择有效的视频文件');
+															}
+														}
+													}, function() {
+														// 取消选择时重置模式并关闭灵动岛
+														currentMode = 'default';
+														setTimeout(() => {
+															toggleIslandExpand();
+														}, 500);
+													}, {
+														filter: 'video', // 只能是 'image'、'video' 或 'all'
+														multiple: false // 是否支持多选
+													});
+												}
+												// 浏览器环境处理
+												else if (typeof window.FileReader !==
+													'undefined') {
+													console.log('浏览器环境，准备创建文件选择器');
+													// 创建隐藏的文件选择input
+													let fileInput = document.getElementById(
+														'browserVideoInput');
+													if (!fileInput) {
+														fileInput = document.createElement(
+															'input');
+														fileInput.id = 'browserVideoInput';
+														fileInput.type = 'file';
+														fileInput.accept = 'video/*'; // 只接受视频文件
+														fileInput.style.display = 'none';
+														document.body.appendChild(fileInput);
+
+														// 监听文件选择事件
+														fileInput.addEventListener('change',
+															function(event) {
+																const file = event.target
+																	.files[0];
+																if (file) {
+																	console.log(
+																		'浏览器中选择了视频文件:',
+																		file.name);
+																	// 创建视频预览URL
+																	const videoUrl = URL
+																		.createObjectURL(
+																			file);
+
+																	// 设置视频背景
+																	const bgVideo = document
+																		.querySelector(
+																			'.bg-video');
+																	const bgImage = document
+																		.querySelector(
+																			'.bg-image');
+																	if (bgVideo) {
+																		// 显示视频元素，隐藏图片元素
+																		bgVideo.style.display = 'block';
+																		if (bgImage) {
+																			bgImage.style.display = 'none';
+																		}
+																		bgVideo.pause();
+																		bgVideo.src =
+																			videoUrl;
+																		bgVideo.load();
+																		bgVideo.play().catch(
+																			err => {
+																				console
+																					.error(
+																						'视频播放失败:',
+																						err
+																					);
+																				// 恢复图片背景
+																				bgVideo.style.display = 'none';
+																				if (bgImage) {
+																					bgImage.style.display = 'block';
+																				}
+																				alert(
+																					'视频播放失败，请尝试其他文件'
+																				);
+																			});
+																	}
+
+																	// 选择完成后自动关闭灵动岛
+																	setTimeout(() => {
+																		toggleIslandExpand
+																			();
+																	}, 500);
+																} else {
+																	// 未选择文件时处理
+																	currentMode = 'default';
+																	setTimeout(() => {
+																		toggleIslandExpand
+																			();
+																	}, 500);
+																}
+																// 重置input值，允许重复选择同一文件
+																fileInput.value = '';
+															});
+													}
+													// 触发文件选择对话框
+													fileInput.click();
+												}
+												// 不支持的环境
+												else {
+													console.log('当前环境不支持视频上传功能');
+													// 显示不支持提示
+													alert('您的浏览器不支持视频上传功能，请使用最新浏览器或5+App');
+												}
+											});
+										}
+
+										const fileUploadClickArea = document.getElementById(
+											'fileUploadClickArea');
+										if (fileUploadClickArea) {
+											// 苹果风格非线性动画曲线（先快后慢，模拟接近系统动效）
+											const appleEasing =
+												'cubic-bezier(0.25, 0.1, 0.25, 1)'; // 核心动画曲线
+
+											// 1. 创建灵动岛容器
+											function createDynamicIsland(isSuccess) {
+												const island = document.createElement('div');
+												const bgColor = isSuccess ? '#34c759' : '#ff3b30';
+												island.style.cssText = `
+										            position: fixed;
+										            top: 8px;
+										            left: 50%;
+										            transform: translateX(-50%);
+										            height: 36px;
+										            width: 14px; /* 初始极小状态 */
+										            border-radius: 18px;
+										            background: ${bgColor};
+										            display: flex;
+										            align-items: center;
+										            justify-content: center;
+										            gap: 8px;
+										            padding: 0 16px;
+										            z-index: 99999;
+										            opacity: 1;
+										            transition: 
+										                width 0.5s ${appleEasing}, /* 先快后慢的宽度动画 */
+										                opacity 0.4s ${appleEasing}; /* 先快后慢的透明度动画 */
+										            overflow: hidden;
+										        `;
+												island.innerHTML = `
+										            <i class="fa" aria-hidden="true" style="
+										                color: #fff; 
+										                opacity: 0; 
+										                transition: opacity 0.3s ${appleEasing}
+										            "></i>
+										            <span style="
+										                color: #fff; 
+										                font-size: 14px; 
+										                white-space: nowrap; 
+										                opacity: 0; 
+										                transition: opacity 0.3s ${appleEasing}
+										            "></span>
+										        `;
+												return island;
+											}
+
+											// 2. 灵动岛提示函数（苹果风格动画）
+											function showDynamicIsland(message, isSuccess = true) {
+												// 移除旧的灵动岛
+												const oldIsland = document.querySelector(
+													'[style*="z-index: 99999"]');
+												if (oldIsland) oldIsland.remove();
+
+												// 创建新灵动岛
+												const island = createDynamicIsland(isSuccess);
+												document.body.appendChild(island);
+												const icon = island.querySelector('i');
+												const text = island.querySelector('span');
+
+												// 设置内容
+												icon.className =
+													`fa ${isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle'}`;
+												text.textContent = message;
+
+												// 第一步：展开动画（14px → 340px，先快后慢）
+												setTimeout(() => {
+													island.style.width = '340px';
+
+													// 第二步：展开动画加速阶段后显示内容（利用动画曲线特性）
+													setTimeout(() => {
+														icon.style.opacity = '1';
+														text.style.opacity = '1';
+
+														// 第三步：停留2秒后开始消失流程
+														setTimeout(() => {
+															// 文字和图标先渐隐（先快后慢）
+															icon.style.opacity =
+																'0';
+															text.style.opacity =
+																'0';
+
+															// 第四步：文字消失后，收缩到140px并渐隐（同步先快后慢）
+															setTimeout(() => {
+																island
+																	.style
+																	.width =
+																	'140px';
+																island
+																	.style
+																	.opacity =
+																	'0';
+
+																// 第五步：动画结束后移除DOM
+																setTimeout
+																	(() => {
+																			island
+																				.remove();
+																		},
+																		500
+																	); // 匹配动画时长
+															}, 300);
+														}, 2000);
+													}, 150); // 展开动画启动后150ms（加速阶段后）显示内容，更自然
+												}, 10);
+											}
+
+											fileUploadClickArea.addEventListener('click', function(e) {
+												e.stopPropagation();
+												console.log('导入课程选项被点击，显示网络登录表单');
+
+												// 关闭当前的灵动岛
+												if (typeof toggleIslandExpand === 'function') {
+													toggleIslandExpand();
+												}
+
+												// 显示登录表单模态框
+												setTimeout(() => {
+													showLoginModal();
+												}, 300);
+											});
+										}
+									}
+
+									// 添加文件上传相关的事件监听器
+									setupUploadEventListeners();
+								} else if (currentMode === 'adjust') {
+									console.log('当前是调节模式，显示背景视频位置调节滑杆');
+									// 调节模式：显示背景视频位置调节滑杆
+									islandContent.classList.add('expanded-content');
+									islandDefaultIcon.style.display = 'none'; // 隐藏默认图标
+
+									// 检查是否有保存的视频背景
+									const hasVideoBackground = (window.plus && plus.storage.getItem('saved_video_background_path')) || 
+																localStorage.getItem('customVideo');
+									const backgroundType = hasVideoBackground ? '背景视频' : '背景图片';
+
+									// 创建调节区域内容
+									const uploadArea = document.getElementById('islandUploadArea');
+									if (uploadArea) {
+										// 设置上传区域样式为垂直排列的弹性布局
+										uploadArea.style.display = 'flex';
+										uploadArea.style.flexDirection = 'column'; // 垂直排列子元素
+										uploadArea.style.alignItems = 'center'; // 水平居中对齐
+										uploadArea.style.justifyContent = 'flex-start'; // 从顶部开始排列，避免被圆角遮挡
+										uploadArea.style.width = '100%';
+										uploadArea.style.height = '100%';
+										uploadArea.style.paddingTop = '20px'; // 添加顶部内边距，避免被圆角遮挡
+										uploadArea.innerHTML = ''; // 清空现有内容
+
+										// 创建第一个滑杆（位置调节）的容器
+										const sliderContainer = document.createElement('div');
+										sliderContainer.style.display = 'flex';
+										sliderContainer.style.flexDirection = 'column'; // 垂直布局
+										sliderContainer.style.alignItems = 'center'; // 水平居中
+										sliderContainer.style.width = '100%';
+										sliderContainer.style.padding = '15px 25px'; // 内边距
+										sliderContainer.style.transform = 'translateY(-16px)'; // 向上移动16px
+
+										// 创建位置说明文字
+										const positionLabel = document.createElement('div');
+										positionLabel.textContent = backgroundType + '呈现位置';
+										positionLabel.style.color = 'white';
+										positionLabel.style.fontSize = '16px';
+										positionLabel.style.marginBottom = '10px';
+										positionLabel.style.alignSelf = 'center'; // 居中对齐
+										sliderContainer.appendChild(positionLabel);
+
+										// 创建位置调节滑杆
+										const slider = document.createElement('input');
+										slider.type = 'range'; // 滑杆类型
+										slider.min = '0'; // 最小值
+										slider.max = '100'; // 最大值
+										// 从本地存储获取上次设置的值，默认为50
+										slider.value = localStorage.getItem('videoPosition') || '50';
+										// 设置滑杆样式
+										slider.style.width = '100%';
+										slider.style.height = '30px';
+										slider.style.webkitAppearance = 'slider-horizontal'; // 水平滑杆样式
+										slider.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'; // 添加背景色
+										slider.style.borderRadius = '15px'; // 圆角
+
+										// 添加滑杆事件监听器（值变化时触发）
+										slider.addEventListener('input', function() {
+											// 保存当前位置值到本地存储
+											localStorage.setItem('videoPosition', this.value);
+											// 同步更新背景位置
+											syncVideoPosition();
+										});
+
+										// 将滑杆添加到容器（不添加标题和数值显示）
+										sliderContainer.appendChild(slider);
+
+										// 创建第二个滑杆（亮度调节）的容器
+										const brightnessSliderContainer = document.createElement('div');
+										brightnessSliderContainer.style.display = 'flex';
+										brightnessSliderContainer.style.flexDirection = 'column'; // 垂直布局
+										brightnessSliderContainer.style.alignItems = 'center'; // 水平居中
+										brightnessSliderContainer.style.width = '100%';
+										brightnessSliderContainer.style.padding = '15px 25px'; // 内边距
+										brightnessSliderContainer.style.transform = 'translateY(-16px)'; // 向上移动16px
+
+										// 创建亮度说明文字
+										const brightnessLabel = document.createElement('div');
+										brightnessLabel.textContent = backgroundType + '呈现亮度';
+										brightnessLabel.style.color = 'white';
+										brightnessLabel.style.fontSize = '16px';
+										brightnessLabel.style.marginBottom = '10px';
+										brightnessLabel.style.alignSelf = 'center'; // 居中对齐
+										brightnessSliderContainer.appendChild(brightnessLabel);
+
+										// 创建亮度调节滑杆
+										const brightnessSlider = document.createElement('input');
+										brightnessSlider.type = 'range'; // 滑杆类型
+										brightnessSlider.min = '50'; // 最小亮度（50%）
+										brightnessSlider.max = '150'; // 最大亮度（150%）
+										// 从本地存储获取上次设置的值，默认为100（100%）
+										brightnessSlider.value = localStorage.getItem(
+											'videoBrightness') || '100';
+										// 设置滑杆样式（与位置滑杆保持一致）
+										brightnessSlider.style.width = '100%';
+										brightnessSlider.style.height = '30px';
+										brightnessSlider.style.webkitAppearance = 'slider-horizontal';
+										brightnessSlider.style.backgroundColor =
+											'rgba(255, 255, 255, 0.2)';
+										brightnessSlider.style.borderRadius = '15px';
+
+										// 添加亮度滑杆事件监听器（值变化时触发）
+										brightnessSlider.addEventListener('input', function() {
+											// 保存当前亮度值到本地存储
+											localStorage.setItem('videoBrightness', this.value);
+											// 同步更新背景亮度
+											syncVideoBrightness();
+										});
+
+										// 将亮度滑杆添加到容器（不添加标题和数值显示）
+										brightnessSliderContainer.appendChild(brightnessSlider);
+
+										/// 创建第三个滑杆（播放速度调节）的容器
+										const speedSliderContainer = document.createElement('div');
+										speedSliderContainer.style.display = 'flex';
+										speedSliderContainer.style.flexDirection = 'column'; // 垂直布局
+										speedSliderContainer.style.alignItems = 'center'; // 水平居中
+										speedSliderContainer.style.width = '100%';
+										speedSliderContainer.style.padding = '15px 25px'; // 内边距
+										speedSliderContainer.style.transform = 'translateY(-16px)'; // 向上移动16px
+
+										// 创建播放速度说明文字
+										const speedLabel = document.createElement('div');
+										speedLabel.textContent = '背景视频播放速度';
+										speedLabel.style.color = 'white';
+										speedLabel.style.fontSize = '16px';
+										speedLabel.style.marginBottom = '10px';
+										speedLabel.style.alignSelf = 'center'; // 居中对齐
+										speedSliderContainer.appendChild(speedLabel);
+
+										// 创建播放速度调节滑杆
+										const speedSlider = document.createElement('input');
+										speedSlider.type = 'range'; // 滑杆类型
+										speedSlider.min = '50'; // 最小速度（0.5倍）
+										speedSlider.max = '200'; // 最大速度（2.0倍）
+										// 从本地存储获取上次设置的值，默认为100（1.0倍）
+										speedSlider.value = localStorage.getItem('videoSpeed') || '100';
+										// 设置滑杆样式（与位置滑杆保持一致）
+										speedSlider.style.width = '100%';
+										speedSlider.style.height = '30px';
+										speedSlider.style.webkitAppearance = 'slider-horizontal';
+										speedSlider.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+										speedSlider.style.borderRadius = '15px';
+
+										// 添加播放速度滑杆事件监听器（值变化时触发）
+										speedSlider.addEventListener('input', function() {
+											// 保存当前速度值到本地存储
+											localStorage.setItem('videoSpeed', this.value);
+											// 同步更新视频播放速度
+											syncVideoSpeed();
+										});
+
+										// 将播放速度滑杆添加到容器（不添加标题和数值显示）
+										speedSliderContainer.appendChild(speedSlider);
+
+										/// 创建第四个滑杆（课程名称文字大小调节）的容器
+										const courseNameSliderContainer = document.createElement('div');
+										courseNameSliderContainer.style.display = 'flex';
+										courseNameSliderContainer.style.flexDirection = 'column'; // 垂直布局
+										courseNameSliderContainer.style.alignItems = 'center'; // 水平居中
+										courseNameSliderContainer.style.width = '100%';
+										courseNameSliderContainer.style.padding = '15px 25px'; // 内边距
+										courseNameSliderContainer.style.transform = 'translateY(-16px)'; // 向上移动16px
+
+										// 创建课程名称文字大小说明文字
+										const courseNameLabel = document.createElement('div');
+										courseNameLabel.textContent = '课程名称文字大小';
+										courseNameLabel.style.color = 'white';
+										courseNameLabel.style.fontSize = '16px';
+										courseNameLabel.style.marginBottom = '10px';
+										courseNameLabel.style.alignSelf = 'center'; // 居中对齐
+										courseNameSliderContainer.appendChild(courseNameLabel);
+
+										// 创建课程名称文字大小调节滑杆
+										const courseNameSlider = document.createElement('input');
+										courseNameSlider.type = 'range'; // 滑杆类型
+										courseNameSlider.min = '10'; // 最小文字大小（10px）
+										courseNameSlider.max = '24'; // 最大文字大小（24px）
+										// 从本地存储获取上次设置的值，默认为16（16px）
+										courseNameSlider.value = localStorage.getItem('courseNameFontSize') || '16';
+										// 设置滑杆样式（与位置滑杆保持一致）
+										courseNameSlider.style.width = '100%';
+										courseNameSlider.style.height = '30px';
+										courseNameSlider.style.webkitAppearance = 'slider-horizontal';
+										courseNameSlider.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+										courseNameSlider.style.borderRadius = '15px';
+
+										// 添加课程名称文字大小滑杆事件监听器（值变化时触发）
+										courseNameSlider.addEventListener('input', function() {
+											// 保存当前课程名称文字大小值到本地存储
+											localStorage.setItem('courseNameFontSize', this.value);
+											// 同步更新课程名称文字大小
+											syncCourseNameFontSize();
+											// 如果在考试信息或成绩信息界面，也同步更新
+											if (window.isExamView) {
+												syncExamInfoFontSize();
+											} else if (window.isGradeView) {
+												syncGradeInfoFontSize();
+											}
+										});
+
+										// 将课程名称文字大小滑杆添加到容器（不添加标题和数值显示）
+										courseNameSliderContainer.appendChild(courseNameSlider);
+
+										/// 创建第五个滑杆（场地信息文字大小调节）的容器
+										const locationTextSliderContainer = document.createElement('div');
+										locationTextSliderContainer.style.display = 'flex';
+										locationTextSliderContainer.style.flexDirection = 'column'; // 垂直布局
+										locationTextSliderContainer.style.alignItems = 'center'; // 水平居中
+										locationTextSliderContainer.style.width = '100%';
+										locationTextSliderContainer.style.padding = '15px 25px'; // 内边距
+										locationTextSliderContainer.style.transform = 'translateY(-16px)'; // 向上移动16px
+
+										// 创建场地信息文字大小说明文字
+										const locationTextLabel = document.createElement('div');
+										locationTextLabel.textContent = '上课地点文字大小';
+										locationTextLabel.style.color = 'white';
+										locationTextLabel.style.fontSize = '16px';
+										locationTextLabel.style.marginBottom = '10px';
+										locationTextLabel.style.alignSelf = 'center'; // 居中对齐
+										locationTextSliderContainer.appendChild(locationTextLabel);
+
+										// 创建场地信息文字大小调节滑杆
+										const locationTextSlider = document.createElement('input');
+										locationTextSlider.type = 'range'; // 滑杆类型
+										locationTextSlider.min = '10'; // 最小文字大小（10px）
+										locationTextSlider.max = '24'; // 最大文字大小（24px）
+										// 从本地存储获取上次设置的值，默认为16（16px）
+										locationTextSlider.value = localStorage.getItem('locationTextFontSize') || '16';
+										// 设置滑杆样式（与位置滑杆保持一致）
+										locationTextSlider.style.width = '100%';
+										locationTextSlider.style.height = '30px';
+										locationTextSlider.style.webkitAppearance = 'slider-horizontal';
+										locationTextSlider.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+										locationTextSlider.style.borderRadius = '15px';
+
+										// 添加场地信息文字大小滑杆事件监听器（值变化时触发）
+										locationTextSlider.addEventListener('input', function() {
+											// 保存当前场地信息文字大小值到本地存储
+											localStorage.setItem('locationTextFontSize', this.value);
+											// 同步更新场地信息文字大小
+											syncLocationTextFontSize();
+											// 如果在考试信息或成绩信息界面，也同步更新
+											if (window.isExamView) {
+												syncExamInfoFontSize();
+											} else if (window.isGradeView) {
+												syncGradeInfoFontSize();
+											}
+										});
+
+										// 将场地信息文字大小滑杆添加到容器（不添加标题和数值显示）
+										locationTextSliderContainer.appendChild(locationTextSlider);
+
+										// 按顺序将五个滑杆容器添加到上传区域（实现上下排版）
+										uploadArea.appendChild(sliderContainer);
+										uploadArea.appendChild(brightnessSliderContainer);
+										uploadArea.appendChild(speedSliderContainer);
+										uploadArea.appendChild(courseNameSliderContainer);
+										uploadArea.appendChild(locationTextSliderContainer);
+									}
+								} else {
+									console.log('当前是默认模式，显示随机绿色表情');
+									// 默认模式：显示随机绿色表情
+									islandContent.classList.add('expanded-content');
+									islandDefaultIcon.style.display = 'none'; // 隐藏默认图标
+
+									// 定义表情图标数组
+									const happyEmojis = [
+										'fa-face-laugh-beam',
+										'fa-face-laugh-squint',
+										'fa-face-smile-wink',
+										'fa-face-laugh-wink',
+										'fa-face-grin-squint-tears',
+									];
+
+									// 随机选择一个表情
+									const randomEmoji = happyEmojis[Math.floor(Math.random() *
+										happyEmojis.length)];
+
+									// 创建并显示随机绿色表情
+									const uploadArea = document.getElementById('islandUploadArea');
+									if (uploadArea) {
+										uploadArea.style.display = 'flex';
+										uploadArea.style.alignItems = 'center';
+										uploadArea.style.justifyContent = 'center';
+										uploadArea.style.width = '100%';
+										uploadArea.style.height = '100%';
+										uploadArea.innerHTML =
+											`<i class="fa-solid ${randomEmoji} text-green-500" style="font-size: 8rem;"></i>`;
+										// 移除上传相关的事件监听器，避免在默认模式下触发上传功能
+										removeUploadEventListeners();
+									}
+
+									// 1秒后自动关闭灵动岛
+									setTimeout(() => {
+										toggleIslandExpand();
+									}, 500);
+								}
+							}, 200); // 阶段3延迟
+							islandAnimationTimers.push(timer3);
+						}, 50); // 阶段2延迟 - 缩短延迟使动画更流畅
+						islandAnimationTimers.push(timer2);
+					}, 0); // 阶段1立即开始
+					islandAnimationTimers.push(timer1);
+				} else {
+					// 收起动画 - 采用更平缓的曲线避免视觉上的"突然消失"
+					// 按钮容器渐显，按钮变为可点击
+					if (navButtonsContainer) {
+						navButtonsContainer.style.opacity = '1';
+						// 启用所有按钮
+						const buttons = navButtonsContainer.querySelectorAll('button');
+						buttons.forEach(button => {
+							button.disabled = false;
+						});
+					}
+
+					// 应用更适合收缩的动画曲线 - 使用苹果风格的曲线
+					islandContainer.style.transition = 'all 0.4s cubic-bezier(0.2, 0.1, 0.3, 1)';
+
+					// 重置展开效果 - 调整延迟与收起动画过渡时间匹配
+					let timer5 = setTimeout(() => {
+						// 清除所有自定义样式，确保回到初始状态
+						islandContainer.style.transition = '';
+						islandContainer.style.transform = '';
+						// 双重确保内容隐藏，防止任何显示问题
+						islandContent.classList.remove('expanded-content');
+						islandDefaultIcon.style.display = 'none'; // 隐藏默认图标
+
+						// 移除上传区域的虚线边框高亮效果
+						const uploadArea = document.getElementById('islandUploadArea');
+						if (uploadArea) {
+							uploadArea.style.borderColor = 'rgba(255,255,255,0.5)';
+							uploadArea.innerHTML = '';
+						}
+
+						// 移除上传相关的事件监听器
+						removeUploadEventListeners();
+
+						// 移除expanded类
+						islandContainer.classList.remove('expanded');
+					}, 400); // 调整延迟时间，与收缩动画时长匹配
+					islandAnimationTimers.push(timer5);
+				}
+			}
+
+			// 设置上传相关的事件监听器
+			function setupUploadEventListeners() {
+				const uploadArea = document.getElementById('islandUploadArea');
+				const fileInput = document.getElementById('islandFileInput');
+
+				if (!uploadArea || !fileInput) return;
+
+				// 移除之前可能存在的事件监听器
+				uploadArea.removeEventListener('click', handleUploadAreaClick);
+				uploadArea.removeEventListener('dragover', handleDragOver);
+				uploadArea.removeEventListener('dragleave', handleDragLeave);
+				uploadArea.removeEventListener('drop', handleDrop);
+				fileInput.removeEventListener('change', handleFileChange);
+
+				// 添加新的事件监听器
+				uploadArea.addEventListener('click', handleUploadAreaClick);
+				uploadArea.addEventListener('dragover', handleDragOver);
+				uploadArea.addEventListener('dragleave', handleDragLeave);
+				uploadArea.addEventListener('drop', handleDrop);
+				fileInput.addEventListener('change', handleFileChange);
+			}
+
+			// 移除上传相关的事件监听器
+			function removeUploadEventListeners() {
+				const uploadArea = document.getElementById('islandUploadArea');
+				const fileInput = document.getElementById('islandFileInput');
+
+				if (!uploadArea || !fileInput) return;
+
+				// 移除事件监听器
+				uploadArea.removeEventListener('click', handleUploadAreaClick);
+				uploadArea.removeEventListener('dragover', handleDragOver);
+				uploadArea.removeEventListener('dragleave', handleDragLeave);
+				uploadArea.removeEventListener('drop', handleDrop);
+				fileInput.removeEventListener('change', handleFileChange);
+			}
+
+			// 处理上传区域点击事件（现在由视频更换逻辑处理）
+			function handleUploadAreaClick(e) {
+				// 阻止事件冒泡到灵动岛容器
+				e.stopPropagation();
+
+				// 此函数现在不执行任何操作，因为点击事件已由背景视频更换功能处理
+			}
+
+			// 处理拖拽悬停事件
+			function handleDragOver(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				const uploadArea = document.getElementById('islandUploadArea');
+				if (uploadArea) {
+					uploadArea.style.borderColor = 'rgba(255,255,255,1)';
+				}
+			}
+
+			// 处理拖拽离开事件
+			function handleDragLeave(e) {
+				e.stopPropagation();
+				const uploadArea = document.getElementById('islandUploadArea');
+				if (uploadArea) {
+					uploadArea.style.borderColor = 'rgba(255,255,255,0.5)';
+				}
+			}
+
+			// 处理文件拖放事件
+			function handleDrop(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				const uploadArea = document.getElementById('islandUploadArea');
+				if (uploadArea) {
+					uploadArea.style.borderColor = 'rgba(255,255,255,0.5)';
+				}
+
+				if (e.dataTransfer.files.length > 0) {
+					handleFileSelection(e.dataTransfer.files[0]);
+				}
+			}
+
+			// 处理文件选择事件
+			function handleFileChange(e) {
+				e.stopPropagation();
+				if (e.target.files.length > 0) {
+					handleFileSelection(e.target.files[0]);
+				}
+			}
+
+			// 处理文件选择
+			function handleFileSelection(file) {
+				// 验证文件类型
+				if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+					// 显示错误图标
+					const islandUploadArea = document.getElementById('islandUploadArea');
+					if (islandUploadArea) {
+						islandUploadArea.innerHTML =
+							'<i class="fa-solid fa-circle-xmark text-red-500" style="font-size: 8rem;"></i>';
+						// 1秒后恢复为上传图标
+						setTimeout(() => {
+							islandUploadArea.innerHTML =
+								'<i class="fa-solid fa-cloud-arrow-up text-blue-500" style="font-size: 8rem;"></i>';
+							const fileInput = document.getElementById('islandFileInput');
+							if (fileInput) {
+								// 重置文件输入框，确保相同文件可以被重新上传
+								fileInput.value = '';
+								islandUploadArea.appendChild(fileInput);
+								// 重新设置事件监听器
+								setupUploadEventListeners();
+							}
+						}, 1000);
+					}
+					return;
+				}
+
+				selectedFile = file;
+
+				// 读取文件内容
+				const reader = new FileReader();
+				reader.onload = (e) => {
+					try {
+						// 预解析文件内容验证格式
+						fileContent = JSON.parse(e.target.result);
+
+						// 自动上传文件
+						handleUpload();
+					} catch (error) {
+						// 显示错误图标
+						const islandUploadArea = document.getElementById('islandUploadArea');
+						if (islandUploadArea) {
+							islandUploadArea.innerHTML =
+								'<i class="fa-solid fa-circle-xmark text-red-500" style="font-size: 8rem;"></i>';
+							// 1秒后恢复为上传图标
+							setTimeout(() => {
+								islandUploadArea.innerHTML =
+									'<i class="fa-solid fa-cloud-arrow-up text-blue-500" style="font-size: 8rem;"></i>';
+								const fileInput = document.getElementById('islandFileInput');
+								if (fileInput) {
+									// 重置文件输入框，确保相同文件可以被重新上传
+									fileInput.value = '';
+									islandUploadArea.appendChild(fileInput);
+									// 重新设置事件监听器
+									setupUploadEventListeners();
+								}
+							}, 0);
+						}
+						selectedFile = null;
+						fileContent = null;
+					}
+				};
+				reader.readAsText(file);
+			}
+
+			// 处理上传按钮点击事件
+			function handleUpload() {
+				try {
+					if (!selectedFile || !fileContent) {
+						throw new Error('请先选择并上传有效的JSON文件');
+					}
+
+					// 验证JSON格式是否符合课程数据要求
+					if (!validateCourseData(fileContent)) {
+						throw new Error('JSON文件格式不符合课程数据要求');
+					}
+
+					// 检查文件内容是否包含"节次"字样
+					const fileContentStr = JSON.stringify(fileContent);
+					if (!fileContentStr.includes('节次')) {
+						throw new Error('文件内容不包含课程节次信息');
+					}
+
+					// 保存到localStorage
+					localStorage.setItem('courseData', JSON.stringify(fileContent));
+
+					// 显示成功图标
+					const islandUploadArea = document.getElementById('islandUploadArea');
+					if (islandUploadArea) {
+						islandUploadArea.innerHTML =
+							'<i class="fa-solid fa-circle-check text-green-500" style="font-size: 8rem;"></i>';
+					}
+
+					// 1秒后自动收起灵动岛并刷新课程表
+					setTimeout(() => {
+						toggleIslandExpand();
+						loadCourseData();
+						updateScheduleDisplay();
+
+						// 重置上传状态，确保下次打开导入按钮时显示上传图标
+						setTimeout(() => {
+							const islandUploadArea = document.getElementById('islandUploadArea');
+							const fileInput = document.getElementById('islandFileInput');
+							if (islandUploadArea && fileInput) {
+								islandUploadArea.innerHTML =
+									'<i class="fa-solid fa-cloud-arrow-up text-blue-500" style="font-size: 8rem;"></i>';
+								// 重置文件输入框，确保相同文件可以被重新上传
+								fileInput.value = '';
+								islandUploadArea.appendChild(fileInput);
+								// 重新设置事件监听器
+								setupUploadEventListeners();
+							}
+						}, 500); // 稍延迟重置，确保灵动岛完全关闭
+					}, 1000);
+
+				} catch (error) {
+					// 显示错误图标
+					const islandUploadArea = document.getElementById('islandUploadArea');
+					if (islandUploadArea) {
+						islandUploadArea.innerHTML =
+							'<i class="fa-solid fa-circle-xmark text-red-500" style="font-size: 8rem;"></i>';
+						// 1秒后恢复为上传图标
+						setTimeout(() => {
+							islandUploadArea.innerHTML =
+								'<i class="fa-solid fa-cloud-arrow-up text-blue-500" style="font-size: 8rem;"></i>';
+							const fileInput = document.getElementById('islandFileInput');
+							if (fileInput) {
+								// 重置文件输入框，确保相同文件可以被重新上传
+								fileInput.value = '';
+								islandUploadArea.appendChild(fileInput);
+								// 重新设置事件监听器
+								setupUploadEventListeners();
+							}
+						}, 1000);
+					}
+					// 显示错误消息
+					showUploadStatus(`数据注入失败：${error.message}`, 'error');
+					selectedFile = null;
+					fileContent = null;
+				}
+			}
+
+			// 验证课程数据格式的辅助函数
+			function validateCourseData(data) {
+				// 检查是否为对象
+				if (typeof data !== 'object' || data === null) {
+					return false;
+				}
+
+				// 检查每个周次的数据
+				for (const week in data) {
+					// 检查周次是否为数字字符串
+					if (isNaN(parseInt(week))) {
+						continue; // 跳过非数字键
+					}
+
+					// 检查周次数据是否为数组
+					if (!Array.isArray(data[week])) {
+						return false;
+					}
+
+					// 检查每门课程的数据
+					for (const course of data[week]) {
+						// 检查必需字段
+						if (!course.hasOwnProperty('课程名称') ||
+							!course.hasOwnProperty('星期') ||
+							!course.hasOwnProperty('节次') ||
+							!course.hasOwnProperty('教师') ||
+							!course.hasOwnProperty('场地')) {
+							return false;
+						}
+					}
+				}
+
+				return true;
+			}
+
+			// 显示上传状态消息
+			function showUploadStatus(message, type) {
+				const statusElement = document.getElementById('uploadStatus');
+				if (!statusElement) return;
+
+				// 设置消息内容和样式
+				statusElement.textContent = message;
+
+				// 根据类型设置不同的样式
+				if (type === 'error') {
+					statusElement.style.color = '#ff4757'; // 红色
+				} else {
+					statusElement.style.color = '#2ed573'; // 绿色
+				}
+
+				// 显示状态消息
+				statusElement.style.opacity = '1';
+
+				// 如果是成功消息，3秒后隐藏
+				if (type === 'success') {
+					setTimeout(() => {
+						statusElement.style.opacity = '0';
+					}, 3000);
+				}
+			}
+
+			// 清除所有灵动岛动画定时器的辅助函数
+			function clearAllIslandTimers() {
+				while (islandAnimationTimers.length > 0) {
+					clearTimeout(islandAnimationTimers.pop());
+				}
+			}
+
+			// 初始化函数
+			function initializeSchedule() {
+				try {
+					// 加载课程数据
+					loadCourseData();
+
+					// 生成日期数据
+					generateDates();
+
+					// 渲染日期滑轨
+					renderDateSlider(true);
+
+					// 添加滑动事件
+					addSwipeEvents();
+
+					// 更新课程表显示
+					updateScheduleDisplay();
+				} catch (error) {
+					console.error('初始化过程中出错:', error);
+					// 即使出错，也继续移除加载状态
+				}
+
+				// 初始化完成，显示页面内容 - 确保无论如何都会执行
+				setTimeout(() => {
+					console.log('初始化完成，显示页面内容');
+
+					const pageBody = document.getElementById('pageBody');
+					const loadingIndicator = document.getElementById('loadingIndicator');
+
+					// 移除加载状态，恢复正常显示
+					if (pageBody) {
+						pageBody.classList.remove('page-loading');
+						pageBody.classList.add('page-loaded');
+						// 确保正常滚动
+						pageBody.style.overflow = 'auto';
+					}
+
+					// 移除加载指示器
+					if (loadingIndicator) {
+						loadingIndicator.classList.add('hidden');
+						// 在动画结束后完全移除元素
+						setTimeout(() => {
+							if (loadingIndicator.parentNode) {
+								loadingIndicator.parentNode.removeChild(loadingIndicator);
+							}
+						}, 300);
+					}
+
+					// 确保所有元素都正常显示
+					document.body.style.filter = 'none';
+					document.body.style.backdropFilter = 'none';
+
+					// 确保背景可见（图片或视频）
+					const bgVideo = document.querySelector('.bg-video');
+					const bgImage = document.querySelector('.bg-image');
+					// 如果有保存的视频路径，显示视频；否则显示图片
+					if (bgVideo && bgVideo.src && bgVideo.src !== window.location.href) {
+						bgVideo.style.zIndex = '-1';
+					} else if (bgImage) {
+						bgImage.style.zIndex = '-2';
+					}
+
+					console.log('页面加载完成，所有功能正常');
+				}, 300); // 缩短延迟时间以清除DOM更新完成
+			}
+
+
+
+			// 同步背景位置设置（支持图片和视频）
+			function syncVideoPosition() {
+				// 使用requestAnimationFrame确保在浏览器下次重绘之前执行
+				requestAnimationFrame(() => {
+					const savedPosition = localStorage.getItem('videoPosition') || '50';
+					const percentage = parseInt(savedPosition);
+					let objectPosition = '';
+
+					// 更精细的左侧调节区间，避免白边
+					if (percentage <= 5) {
+						objectPosition = '0% center';
+					} else if (percentage <= 10) {
+						objectPosition = '5% center';
+					} else if (percentage <= 15) {
+						objectPosition = '10% center';
+					} else if (percentage <= 20) {
+						objectPosition = '15% center';
+					} else if (percentage <= 25) {
+						objectPosition = '20% center';
+					} else if (percentage <= 30) {
+						objectPosition = '25% center';
+					} else if (percentage <= 35) {
+						objectPosition = '30% center';
+					} else if (percentage <= 40) {
+						objectPosition = '35% center';
+					} else if (percentage <= 45) {
+						objectPosition = '40% center';
+					} else if (percentage <= 55) {
+						objectPosition = 'center center';
+					} else if (percentage <= 60) {
+						objectPosition = '60% center';
+					} else if (percentage <= 65) {
+						objectPosition = '65% center';
+					} else if (percentage <= 70) {
+						objectPosition = '70% center';
+					} else if (percentage <= 75) {
+						objectPosition = '75% center';
+					} else if (percentage <= 80) {
+						objectPosition = '80% center';
+					} else if (percentage <= 85) {
+						objectPosition = '85% center';
+					} else if (percentage <= 90) {
+						objectPosition = '90% center';
+					} else if (percentage <= 95) {
+						objectPosition = '95% center';
+					} else {
+						objectPosition = '100% center';
+					}
+
+					// 同时更新CSS变量和直接设置样式以确保同步
+					document.documentElement.style.setProperty('--video-position', objectPosition);
+					// 同时应用于图片和视频
+					const bgVideo = document.querySelector('.bg-video');
+					const bgImage = document.querySelector('.bg-image');
+					if (bgVideo) {
+						bgVideo.style.objectPosition = objectPosition;
+					}
+					if (bgImage) {
+						bgImage.style.objectPosition = objectPosition;
+					}
+				});
+			}
+
+			// 同步背景亮度设置（支持图片和视频）
+			function syncVideoBrightness() {
+				// 使用requestAnimationFrame确保在浏览器下次重绘之前执行
+				requestAnimationFrame(() => {
+					const savedBrightness = localStorage.getItem('videoBrightness') || '100';
+					const brightnessValue = parseInt(savedBrightness) / 100;
+
+					// 同时应用于图片和视频
+					const bgVideo = document.querySelector('.bg-video');
+					const bgImage = document.querySelector('.bg-image');
+					if (bgVideo) {
+						bgVideo.style.filter = `brightness(${brightnessValue})`;
+					}
+					if (bgImage) {
+						bgImage.style.filter = `brightness(${brightnessValue})`;
+					}
+				});
+			}
+			// 同步视频背景播放速度设置
+			function syncVideoSpeed() {
+				// 使用requestAnimationFrame确保在浏览器下次重绘之前执行
+				requestAnimationFrame(() => {
+					const savedSpeed = localStorage.getItem('videoSpeed') || '100';
+					const speedValue = parseInt(savedSpeed) / 100;
+
+					const bgVideo = document.querySelector('.bg-video');
+					if (bgVideo) {
+						// 设置视频播放速度
+						bgVideo.playbackRate = speedValue;
+					}
+				});
+			}
+
+			// 同步课程名称文字大小设置
+			function syncCourseNameFontSize() {
+				// 使用requestAnimationFrame确保在浏览器下次重绘之前执行
+				requestAnimationFrame(() => {
+					const savedFontSize = localStorage.getItem('courseNameFontSize') || '16';
+					const fontSize = parseInt(savedFontSize);
+					// 设置手写字体族
+					const fontFamily = 'Cursive, Brush Script MT';
+
+					// 更新CSS变量以控制表格视图中的课程名称大小
+					const tableTextControl = document.querySelector('.table-text-control');
+					if (tableTextControl) {
+						tableTextControl.style.setProperty('--course-name-size', `${fontSize - 6}px`);
+					}
+
+					// 更新列表视图中的课程名称
+					const courseNameElements = document.querySelectorAll('.course-card h3');
+					courseNameElements.forEach(element => {
+						element.style.fontSize = `${fontSize}px`;
+						element.style.fontFamily = fontFamily;
+					});
+
+					// 更新表格视图中的课程名称
+					const tableCourseNameElements = document.querySelectorAll('.course-cell .font-medium');
+					tableCourseNameElements.forEach(element => {
+						element.style.fontSize = `${fontSize - 6}px`; // 表格视图中的字体稍小
+						element.style.fontFamily = fontFamily;
+					});
+
+					// 更新课程详情弹窗中的课程名称
+					const detailCourseName = document.querySelector('.modal-content h3.text-2xl');
+					if (detailCourseName) {
+						detailCourseName.style.fontSize = `${fontSize + 4}px`; // 详情弹窗中的字体稍大
+						detailCourseName.style.fontFamily = fontFamily;
+					}
+				});
+			}
+
+			// 同步场地信息文字大小设置
+			function syncLocationTextFontSize() {
+				// 使用requestAnimationFrame确保在浏览器下次重绘之前执行
+				requestAnimationFrame(() => {
+					const savedFontSize = localStorage.getItem('locationTextFontSize') || '16';
+					const fontSize = parseInt(savedFontSize);
+
+					// 更新CSS变量以控制表格视图中的场地信息大小
+					const tableTextControl = document.querySelector('.table-text-control');
+					if (tableTextControl) {
+						tableTextControl.style.setProperty('--location-text-size', `${fontSize - 6}px`);
+					}
+
+					// 更新列表视图中的场地信息
+					const locationElements = document.querySelectorAll('.course-card .fa-map-marker-alt + span');
+					locationElements.forEach(element => {
+						element.style.fontSize = `${fontSize}px`;
+					});
+
+					// 更新表格视图中的场地信息
+				const tableLocationElements = document.querySelectorAll('.course-cell .opacity-80');
+				tableLocationElements.forEach(element => {
+					element.style.fontSize = `${fontSize - 6}px`; // 表格视图中的字体稍小
+				});
+
+					// 更新课程详情弹窗中的场地信息
+					const detailLocation = document.querySelector('.modal-content .location');
+					if (detailLocation) {
+						detailLocation.style.fontSize = `${fontSize}px`;
+					}
+				});
+			}
+
+			// 同步考试信息文字大小设置
+			function syncExamInfoFontSize() {
+				// 使用requestAnimationFrame确保在浏览器下次重绘之前执行
+				requestAnimationFrame(() => {
+					// 获取保存的课程名称和场地信息字体大小
+					const savedCourseNameFontSize = localStorage.getItem('courseNameFontSize') || '16';
+					const savedLocationTextFontSize = localStorage.getItem('locationTextFontSize') || '16';
+					const courseNameFontSize = parseInt(savedCourseNameFontSize);
+					const locationTextFontSize = parseInt(savedLocationTextFontSize);
+					// 设置手写字体族
+					const fontFamily = 'Cursive, Brush Script MT';
+
+					// 更新考试信息中的科目名称
+					const examSubjectElements = document.querySelectorAll('#listViewContainer .course-card h3');
+					examSubjectElements.forEach(element => {
+						element.style.fontSize = `${courseNameFontSize}px`;
+						element.style.fontFamily = fontFamily;
+						// 添加自动换行功能
+						element.style.wordWrap = 'break-word';
+						element.style.overflowWrap = 'break-word';
+						element.style.wordBreak = 'break-word';
+						element.style.whiteSpace = 'normal';
+					});
+
+					// 更新考试信息中的考试时间（使用固定字体大小）
+					const examTimeElements = document.querySelectorAll('#listViewContainer .course-card .text-lg.font-medium');
+					examTimeElements.forEach(element => {
+						element.style.fontSize = '14px';
+					});
+
+					// 更新考试信息中的学分信息（使用固定字体大小）
+					const examCreditElements = document.querySelectorAll('#listViewContainer .course-card .fa-graduation-cap + span');
+					examCreditElements.forEach(element => {
+						element.style.fontSize = '14px';
+					});
+
+					// 更新考试信息中的考试地点（与场地信息文字大小关联）
+					const examLocationElements = document.querySelectorAll('#listViewContainer .course-card .fa-map-marker-alt + span');
+					examLocationElements.forEach(element => {
+						element.style.fontSize = `${locationTextFontSize}px`;
+					});
+
+					// 更新考试信息中的考试性质（使用固定字体大小）
+					const examNatureElements = document.querySelectorAll('#listViewContainer .course-card .text-sm.font-medium');
+					examNatureElements.forEach(element => {
+						element.style.fontSize = '13px';
+					});
+				});
+			}
+
+			// 同步成绩信息文字大小设置
+			function syncGradeInfoFontSize() {
+				// 使用requestAnimationFrame确保在浏览器下次重绘之前执行
+				requestAnimationFrame(() => {
+					// 设置手写字体族
+					const fontFamily = 'Cursive, Brush Script MT';
+
+					// 根据视窗宽度设置科目名称字体大小
+					const subjectFontSize = window.innerWidth >= 411 ? '18px' : '14px';
+
+					// 更新成绩信息中的科目名称（响应式字体大小）
+					const gradeSubjectElements = document.querySelectorAll('#listViewContainer .course-card h3');
+					gradeSubjectElements.forEach(element => {
+						element.style.setProperty('font-size', subjectFontSize, 'important');
+						element.style.fontFamily = fontFamily;
+					});
+
+					// 更新成绩信息中的成绩数值（使用固定字体大小）
+					const gradeScoreElements = document.querySelectorAll('#listViewContainer .course-card .absolute.top-3.right-3 .text-3xl.font-bold');
+					gradeScoreElements.forEach(element => {
+						element.style.setProperty('font-size', '24px', 'important');
+					});
+
+					// 更新成绩信息中的考试性质（使用固定字体大小）
+					const gradeNatureElements = document.querySelectorAll('#listViewContainer .course-card .flex.items-center span');
+					gradeNatureElements.forEach(element => {
+						element.style.setProperty('font-size', '14px', 'important');
+					});
+
+					// 更新成绩信息中的学分信息（使用固定字体大小）
+					const gradeCreditElements = document.querySelectorAll('#listViewContainer .course-card .text-right span');
+					gradeCreditElements.forEach(element => {
+						element.style.setProperty('font-size', '14px', 'important');
+					});
+				});
+			}
+
+			// 加载自定义视频背景
+			function loadCustomVideo() {
+				const customVideo = localStorage.getItem('customVideo') || localStorage.getItem('saved_video_background_path');
+				const explicitWallpaperSelected = localStorage.getItem('explicitWallpaperSelected') === 'true';
+				const bgVideo = document.querySelector('.bg-video');
+				const bgImage = document.querySelector('.bg-image');
+				if (customVideo && bgVideo && !explicitWallpaperSelected) {
+					// 显示视频元素，隐藏图片元素
+					bgVideo.style.display = 'block';
+					if (bgImage) {
+						bgImage.style.display = 'none';
+					}
+					bgVideo.src = customVideo;
+					bgVideo.load(); // 重新加载视频
+					bgVideo.play().catch(() => {
+						console.error('视频播放失败，恢复图片背景');
+						bgVideo.style.display = 'none';
+						if (bgImage) {
+							bgImage.style.display = 'block';
+						}
+					});
+				}
+			}
+
+			// 页面加载完成后初始化
+			document.addEventListener('DOMContentLoaded', () => {
+				console.log('DOM加载完成，开始初始化');
+
+				// 立即隐藏所有模态框
+				const courseModal = document.getElementById('courseModal');
+				if (courseModal) {
+					courseModal.classList.remove('active');
+					courseModal.style.display = 'none';
+				}
+
+				const atomLoadingModal = document.getElementById('atomLoadingModal');
+				if (atomLoadingModal) {
+					atomLoadingModal.classList.remove('active');
+					atomLoadingModal.style.display = 'none';
+				}
+
+				// 页面加载时自动应用保存的设置
+				applySavedVideoPosition();
+
+				// 检查是否显示壁纸选择提示红点
+				const wallpaperBadge = document.getElementById('wallpaperBadge');
+				if (wallpaperBadge) {
+					const selectedWallpaper = localStorage.getItem('selectedWallpaper');
+					const savedVideoPath = (window.plus && plus.storage.getItem('saved_video_background_path')) || localStorage.getItem('saved_video_background_path') || localStorage.getItem('customVideo');
+					if (selectedWallpaper || savedVideoPath) {
+						wallpaperBadge.style.display = 'none';
+					} else {
+						wallpaperBadge.style.display = 'block';
+					}
+				}
+
+				// 应用保存的课程名称和场地文字字体大小
+				syncCourseNameFontSize();
+				syncLocationTextFontSize();
+				
+				// 检查是否需要同步考试信息或成绩信息的文字大小
+				const lastView = localStorage.getItem('lastView');
+				if (lastView === 'exam') {
+					// 如果上次视图为考试信息，同步考试信息文字大小
+					syncExamInfoFontSize();
+					window.isExamView = true;
+				} else if (lastView === 'grade') {
+					// 如果上次视图为成绩信息，同步成绩信息文字大小
+					syncGradeInfoFontSize();
+					window.isGradeView = true;
+				}
+
+				// 立即为导入按钮添加点击事件处理程序（优先处理）
+				const importBtn = document.getElementById('importBtn');
+				if (importBtn) {
+					console.log('找到导入按钮，绑定点击事件');
+					// 修改为按下导入按钮后只展开灵动岛，不自动触发文件选择
+					importBtn.onclick = function(e) {
+						e.stopPropagation();
+						console.log('导入按钮被点击，立即触发灵动岛展开动画');
+
+						// 立即展开灵动岛动画
+						toggleIslandExpand('import');
+					};
+				}
+
+
+				// 为调节按钮添加点击事件处理程序
+				const adjustBtn = document.getElementById('adjustBtn');
+				if (adjustBtn) {
+					console.log('找到调节按钮，绑定点击事件');
+					adjustBtn.onclick = function(e) {
+						e.stopPropagation();
+						console.log('调节按钮被点击，立即触发灵动岛展开动画');
+
+						// 立即展开灵动岛动画，显示调节背景视频位置的滑杆
+						toggleIslandExpand('adjust');
+					};
+				}
+
+				// 添加全局点击事件监听器来关闭展开的灵动岛
+				document.addEventListener('click', (e) => {
+					const islandContainer = document.getElementById('islandContainer');
+					const importBtn = document.getElementById('importBtn'); // 在事件处理程序内部重新获取importBtn元素
+
+					// 检查是否点击了灵动岛容器外部的区域
+					if (islandContainer &&
+						!islandContainer.contains(e.target) &&
+						(!importBtn || (e.target !== importBtn && !importBtn.contains(e.target))) &&
+						islandContainer.classList.contains('expanded')) {
+						// 关闭灵动岛
+						toggleIslandExpand();
+					}
+				});
+
+				// 稍微延迟以确保加载指示器可见
+				setTimeout(() => {
+					initializeSchedule();
+				}, 100);
+
+				// 为灵动岛容器添加点击事件处理程序
+				const islandContainer = document.getElementById('islandContainer');
+				if (islandContainer) {
+					islandContainer.addEventListener('click', (e) => {
+						// 防止事件冒泡
+						e.stopPropagation();
+						toggleIslandExpand('default');
+					});
+				}
+
+				// 检查并应用配色方案
+				if (!checkAndApplyColorScheme()) {
+					// 如果没有重新加载，确保保存当前应用的配色方案
+					const currentPalette = getCoursePaletteFromStorage();
+					if (currentPalette) {
+						localStorage.setItem('lastAppliedPalette', JSON.stringify(currentPalette));
+					}
+				}
+			});
+		</script>
+		<!-- 主要内容区 -->
+		<main class="container mx-auto px-4 py-1">
+			<!-- 列表容器 -->
+			<div id="listViewContainer" class="view-container">
+				<!-- 今日概览 -->
+				<section class="mb-6">
+					<!-- 内容将通过JS动态填充 -->
+				</section>
+			</div>
+		</main>
+
+		<!-- 背景视频更换功能 -->
+		<script type="text/javascript">
+			const STORAGE_KEY = 'saved_video_background_path';
+
+			// 应用保存的背景位置和亮度（支持图片和视频）
+			function applySavedVideoPosition() {
+				// 使用requestAnimationFrame确保在浏览器下次重绘之前执行
+				requestAnimationFrame(() => {
+					// 应用位置设置
+					const savedPosition = localStorage.getItem('videoPosition') || '50';
+					const percentage = parseInt(savedPosition);
+					let objectPosition = '';
+
+					// 更精细的调节逻辑，左侧区间划分更细
+					if (percentage <= 2) {
+						objectPosition = '0% center'; // 0-2% 保持最左侧
+					} else if (percentage <= 5) {
+						objectPosition = '2% center'; // 2-5% 微调
+					} else if (percentage <= 8) {
+						objectPosition = '4% center'; // 5-8% 微调
+					} else if (percentage <= 11) {
+						objectPosition = '6% center'; // 8-11% 微调
+					} else if (percentage <= 14) {
+						objectPosition = '8% center'; // 11-14% 微调
+					} else if (percentage <= 17) {
+						objectPosition = '10% center'; // 14-17% 微调
+					} else if (percentage <= 20) {
+						objectPosition = '12% center'; // 17-20% 微调
+					} else if (percentage <= 25) {
+						objectPosition = '15% center'; // 20-25% 调整
+					} else if (percentage <= 30) {
+						objectPosition = '20% center'; // 25-30% 调整
+					} else if (percentage <= 35) {
+						objectPosition = '25% center'; // 35-40% 调整
+					} else if (percentage <= 40) {
+						objectPosition = '30% center'; // 35-40% 调整
+					} else if (percentage <= 45) {
+						objectPosition = '35% center'; // 40-45% 调整
+					} else if (percentage <= 55) {
+						objectPosition = 'center center'; // 45-55% 居中
+					} else if (percentage <= 60) {
+						objectPosition = '60% center'; // 55-60% 调整
+					} else if (percentage <= 65) {
+						objectPosition = '65% center'; // 60-65% 调整
+					} else if (percentage <= 70) {
+						objectPosition = '70% center'; // 65-70% 调整
+					} else if (percentage <= 75) {
+						objectPosition = '75% center'; // 70-75% 调整
+					} else if (percentage <= 80) {
+						objectPosition = '80% center'; // 75-80% 调整
+					} else if (percentage <= 85) {
+						objectPosition = '85% center'; // 80-85% 调整
+					} else if (percentage <= 90) {
+						objectPosition = '90% center'; // 85-90% 调整
+					} else if (percentage <= 95) {
+						objectPosition = '95% center'; // 90-95% 调整
+					} else {
+						objectPosition = '100% center'; // 95-100% 最右侧
+					}
+
+					// 同时更新CSS变量和直接设置样式以确保同步
+					document.documentElement.style.setProperty('--video-position', objectPosition);
+					// 同时应用于图片和视频
+					const bgVideo = document.querySelector('.bg-video');
+					const bgImage = document.querySelector('.bg-image');
+					if (bgVideo) {
+						bgVideo.style.objectPosition = objectPosition;
+					}
+					if (bgImage) {
+						bgImage.style.objectPosition = objectPosition;
+					}
+
+					// 应用亮度设置
+					const savedBrightness = localStorage.getItem('videoBrightness') || '100';
+					const brightnessValue = parseInt(savedBrightness) / 100;
+					if (bgVideo) {
+						bgVideo.style.filter = `brightness(${brightnessValue})`;
+					}
+					if (bgImage) {
+						bgImage.style.filter = `brightness(${brightnessValue})`;
+					}
+
+					// 应用播放速度设置（仅视频）
+					const savedSpeed = localStorage.getItem('videoSpeed') || '100';
+					const speedValue = parseInt(savedSpeed) / 100;
+					if (bgVideo) {
+						bgVideo.playbackRate = speedValue;
+					}
+				});
+			}
+
+			// 创建selectVideoBtn隐藏元素
+			let selectBtn = document.getElementById('selectVideoBtn');
+			if (!selectBtn) {
+				selectBtn = document.createElement('div');
+				selectBtn.id = 'selectVideoBtn';
+				selectBtn.style.display = 'none';
+				document.body.appendChild(selectBtn);
+			}
+
+			// 定义全局的setVideoBackground函数，确保在任何地方都能调用
+			function setVideoBackground(url) {
+				const bgVideo = document.querySelector('.bg-video');
+				const bgImage = document.querySelector('.bg-image');
+				if (!bgVideo) {
+					console.error('未找到背景视频元素');
+					return;
+				}
+
+				// 显示视频元素，隐藏图片元素
+				bgVideo.style.display = 'block';
+				if (bgImage) {
+					bgImage.style.display = 'none';
+				}
+
+				bgVideo.pause();
+				bgVideo.src = url;
+				bgVideo.load();
+				bgVideo.play().catch(() => {
+					// 播放失败时清除无效记录，恢复图片背景
+					if (window.plus) {
+						plus.storage.removeItem(STORAGE_KEY);
+					}
+					console.error('视频播放失败，恢复图片背景');
+					bgVideo.style.display = 'none';
+					if (bgImage) {
+						bgImage.style.display = 'block';
+					}
+				});
+
+				// 设置完成后自动关闭灵动岛
+				setTimeout(() => {
+					toggleIslandExpand();
+				}, 500);
+			}
+
+			// 提前为selectVideoBtn绑定点击事件，确保在导入按钮点击前就已经绑定
+			selectBtn.addEventListener('click', function() {
+				if (window.plus && plus.gallery) {
+					console.log('selectVideoBtn被点击，调用plus.gallery.pick');
+					plus.gallery.pick(function(path) {
+						// 保存视频路径
+						plus.storage.setItem(STORAGE_KEY, path);
+						localStorage.setItem(STORAGE_KEY, path);
+						// 设置视频背景
+						const localUrl = plus.io.convertLocalFileSystemURL(path);
+						setVideoBackground(localUrl);
+
+						// 选择完成后自动关闭灵动岛
+						setTimeout(() => {
+							toggleIslandExpand();
+						}, 500);
+					}, function() {
+						// 取消选择时重置模式并关闭灵动岛
+						currentMode = 'default';
+						setTimeout(() => {
+							toggleIslandExpand();
+						}, 500);
+					}, {
+						filter: 'video',
+						multiple: false
+					});
+				} else {
+					console.log('plus环境不可用，等待plusready事件');
+					// 如果plus环境不可用，延迟后重试
+					setTimeout(() => {
+						selectBtn.click();
+					}, 100);
+				}
+			});
+
+			document.addEventListener('plusready', function() {
+				// 使用class选择器获取视频元素，因为没有id="bgVideo"的元素
+				const bgVideo = document.querySelector('.bg-video');
+
+				if (!bgVideo) {
+					console.error('未找到背景视频元素');
+					return;
+				}
+
+				// 加载已保存的视频 
+				function loadSavedVideo() {
+					const savedPath = plus.storage.getItem(STORAGE_KEY);
+					if (savedPath) {
+						const localUrl = plus.io.convertLocalFileSystemURL(savedPath);
+						setVideoBackground(localUrl);
+					} else {
+						// 如果没有保存的视频路径，确保灵动岛处于关闭状态
+						setTimeout(() => {
+							const islandContainer = document.getElementById('islandContainer');
+							if (islandContainer && islandContainer.classList.contains('expanded')) {
+								toggleIslandExpand();
+							}
+						}, 500);
+					}
+				}
+
+				// 启动时加载已保存的视频 
+				loadSavedVideo();
+
+				// 视频错误处理 
+				bgVideo.addEventListener('error', function() {
+					plus.storage.removeItem(STORAGE_KEY);
+					// 恢复图片背景
+					const bgImage = document.querySelector('.bg-image');
+					bgVideo.style.display = 'none';
+					if (bgImage) {
+						bgImage.style.display = 'block';
+					}
+				});
+			});
+		</script>
+	</body>
+
+</html>
+
+<!-- 表格容器 -->
+<main class="w-full px-0 py-0.01">
+	<div class="hidden table-text-control" id="excelViewContainer">
+		<table class="border-collapse w-full" id="excelView" style="table-layout: fixed; width: 100%;">
+			<thead>
+				<tr>
+					<th class="pb-3 text-center font-normal text-white/80 text-sm"
+						style="width: 14.285%; min-width: 80px; max-width: 80px;">周一</th>
+					<th class="pb-3 text-center font-normal text-white/80 text-sm"
+						style="width: 14.285%; min-width: 80px; max-width: 80px;">周二</th>
+					<th class="pb-3 text-center font-normal text-white/80 text-sm"
+						style="width: 14.285%; min-width: 80px; max-width: 80px;">周三</th>
+					<th class="pb-3 text-center font-normal text-white/80 text-sm"
+						style="width: 14.285%; min-width: 80px; max-width: 80px;">周四</th>
+					<th class="pb-3 text-center font-normal text-white/80 text-sm"
+						style="width: 14.285%; min-width: 80px; max-width: 80px;">周五</th>
+					<th class="pb-3 text-center font-normal text-white/80 text-sm"
+						style="width: 14.285%; min-width: 80px; max-width: 80px;">周六</th>
+					<th class="pb-3 text-center font-normal text-white/80 text-sm"
+						style="width: 14.285%; min-width: 80px; max-width: 80px;">周日</th>
+				</tr>
+			</thead>
+			<tbody>
+				<!-- 内容将通过JS动态填充 -->
+			</tbody>
+		</table>
+	</div>
+</main>
+
+
+<!-- 课程详情弹窗 -->
+<div class="modal-backdrop" id="courseModal"
+	style="display: none; transition: opacity 400ms cubic-bezier(0.4, 0, 0.2, 1);">
+	<div class="modal-content" style="transition: all 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94);">
+		<div class="p-4" id="modalContent">
+			<!-- 内容将通过JS动态填充 -->
+		</div>
+	</div>
+</div>
+<!-- 在现有模态框之后添加登录表单模态框 -->
+<!-- 登录表单模态框 -->
+<div class="modal-backdrop" id="loginModal"
+	style="display: none; transition: opacity 500ms cubic-bezier(0.4, 0, 0.2, 1);">
+	<div class="modal-content" style="transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1); max-width: 380px; margin: 0 16px; width: calc(100% - 32px); background: rgba(255, 255, 255, 1); backdrop-filter: blur(px); -webkit-backdrop-filter: blur(2px); border: 1px solid rgba(255, 255, 255, 0);">
+		<div class="p-4">
+			<div class="relative flex justify-center items-center mb-2">
+                <h3 class="text-2xl font-bold text-neutral-800">
+                办事大厅登录
+               </h3>
+                <button class="absolute right-0 close-btn text-neutral-400 hover:text-neutral-600 transition-colors p-1"
+                     onclick="closeLoginModal()">
+                <i class="fas fa-times text-lg"></i>
+              </button>
+            </div>
+
+			<div class="space-y-3">
+				<div>
+					<label class="block text-sm font-medium text-neutral-700 mb-1 flex items-center">
+						<i class="fas fa-user mr-1.5 text-primary"></i>
+						用户名
+					</label>
+					<div class="relative">
+						<input type="password" id="loginUsername"
+							class="w-full px-2.5 py-1.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+							placeholder="请输入学号">
+						<button type="button"
+							class="absolute inset-y-0 right-0 px-3 text-neutral-500 hover:"
+							onclick="toggleLoginUsername()">
+							<i class="fas fa-eye-slash text-primary"></i>
+						</button>
+					</div>
+				</div>
+
+				<div>
+					<label class="block text-sm font-medium text-neutral-700 mb-1 flex items-center">
+						<i class="fas fa-lock mr-1.5 text-primary"></i>
+						密码
+					</label>
+					<div class="relative">
+						<input type="password" id="loginPassword"
+							class="w-full px-2.5 py-1.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+							placeholder="请输入密码">
+						<button type="button"
+							class="absolute inset-y-0 right-0 px-3 text-neutral-500 hover:"
+							onclick="toggleLoginPassword()">
+							<i class="fas fa-eye-slash text-primary"></i>
+						</button>
+					</div>
+				</div>
+
+				<div class="flex items-center">
+					<input type="checkbox" id="rememberPassword" class="mr-2 custom-blue-checkbox">
+					<label for="rememberPassword" class="text-sm text-neutral-700 flex items-center">
+						记住密码
+					</label>
+				</div>
+
+				<div id="loginStatus" class="hidden text-sm p-1 rounded-[6px] text-center"></div>
+
+				<div class="flex justify-center">
+					<button type="button" id="loginSubmitBtn"
+						class="px-6 py-1.5 bg-primary text-white rounded-[10px] hover:bg-blue-600 transition-colors flex items-center btn-scale text-sm"
+						onclick="handleNetworkLogin()">
+						<i class="fa-solid fa-cloud-arrow-up"></i>
+						从教务系统导入课表数据
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- 在现有脚本部分添加以下代码 -->
+<script>
+	// 全局变量
+	let sessionData = {
+		cookies: {},
+		headers: {
+			"Accept": "text/html, application/xhtml+xml, application/xml; q=0.9, */*; q=0.8",
+			"Accept-Language": "zh-CN",
+			"Connection": "keep-alive",
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.18363",
+		},
+		csrftoken: null
+	};
+
+	// 显示登录模态框
+	function showLoginModal() {
+		const loginModal = document.getElementById('loginModal');
+		if (loginModal) {
+			loginModal.style.display = 'flex';
+			// 使用requestAnimationFrame确保DOM更新后再应用动画
+			requestAnimationFrame(() => {
+				loginModal.classList.add('active');
+				loginModal.classList.remove('closing');
+			});
+
+			// 检查本地存储中是否有保存的登录信息
+			const savedUser = localStorage.getItem('jwxt_username');
+			const savedPassword = localStorage.getItem('jwxt_password');
+			const remember = localStorage.getItem('jwxt_remember') === 'true';
+
+			if (savedUser) {
+				document.getElementById('loginUsername').value = savedUser;
+			}
+
+			// 如果用户选择记住密码且保存了密码，则填充密码字段
+			if (remember && savedPassword) {
+				document.getElementById('loginPassword').value = atob(savedPassword); // base64解码
+				document.getElementById('rememberPassword').checked = true;
+			} else {
+				document.getElementById('rememberPassword').checked = false;
+			}
+
+			// 恢复用户名的显示状态
+			const usernameDisplayState = localStorage.getItem('username_display_state');
+			if (usernameDisplayState) {
+				const usernameInput = document.getElementById('loginUsername');
+				const parentDiv = usernameInput.parentNode;
+				const toggleBtn = parentDiv.querySelector('button');
+				const icon = toggleBtn.querySelector('i');
+				
+				usernameInput.setAttribute('type', usernameDisplayState);
+				
+				if (usernameDisplayState === 'password') {
+					icon.classList.remove('fa-eye');
+					icon.classList.add('fa-eye-slash');
+				} else {
+					icon.classList.remove('fa-eye-slash');
+					icon.classList.add('fa-eye');
+				}
+			}
+
+			// 恢复密码的显示状态
+			const passwordDisplayState = localStorage.getItem('password_display_state');
+			if (passwordDisplayState) {
+				const passwordInput = document.getElementById('loginPassword');
+				const toggleBtn = passwordInput.nextElementSibling;
+				const icon = toggleBtn.querySelector('i');
+				
+				passwordInput.setAttribute('type', passwordDisplayState);
+				
+				if (passwordDisplayState === 'password') {
+					icon.classList.remove('fa-eye');
+					icon.classList.add('fa-eye-slash');
+				} else {
+					icon.classList.remove('fa-eye-slash');
+					icon.classList.add('fa-eye');
+				}
+			}
+		}
+	}
+
+	// 关闭登录模态框
+	function closeLoginModal() {
+		const loginModal = document.getElementById('loginModal');
+		if (loginModal) {
+			// 添加关闭动画类，触发向下生长回灵动岛的动画
+			loginModal.classList.add('closing');
+			loginModal.classList.remove('active');
+
+			// 等待动画结束后隐藏元素 - 与CSS动画时间保持一致
+			setTimeout(() => {
+				loginModal.style.display = 'none';
+				loginModal.classList.remove('closing');
+			}, 300); // 与CSS动画时间一致
+		}
+	}
+
+	// 切换密码显示/隐藏
+	function toggleLoginPassword() {
+		const passwordInput = document.getElementById('loginPassword');
+		const toggleBtn = passwordInput.nextElementSibling;
+		const icon = toggleBtn.querySelector('i');
+
+		const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+		passwordInput.setAttribute('type', type);
+
+		// 保存用户的显示状态到localStorage
+		localStorage.setItem('password_display_state', type);
+
+		if (type === 'password') {
+			icon.classList.remove('fa-eye');
+			icon.classList.add('fa-eye-slash');
+		} else {
+			icon.classList.remove('fa-eye-slash');
+			icon.classList.add('fa-eye');
+		}
+	}
+
+	// 切换用户名显示/隐藏
+	function toggleLoginUsername() {
+		const usernameInput = document.getElementById('loginUsername');
+		const parentDiv = usernameInput.parentNode;
+		const toggleBtn = parentDiv.querySelector('button');
+		const icon = toggleBtn.querySelector('i');
+
+		const type = usernameInput.getAttribute('type') === 'password' ? 'text' : 'password';
+		usernameInput.setAttribute('type', type);
+
+		// 保存用户的显示状态到localStorage
+		localStorage.setItem('username_display_state', type);
+
+		if (type === 'password') {
+			icon.classList.remove('fa-eye');
+			icon.classList.add('fa-eye-slash');
+		} else {
+			icon.classList.remove('fa-eye-slash');
+			icon.classList.add('fa-eye');
+		}
+	}
+
+	// 显示加载中
+	function showLoginLoading(text = '加载中...') {
+		const submitBtn = document.getElementById('loginSubmitBtn');
+		submitBtn.disabled = true;
+		submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${text}`;
+	}
+
+	// 隐藏加载中
+	function hideLoginLoading() {
+		const submitBtn = document.getElementById('loginSubmitBtn');
+		submitBtn.disabled = false;
+		submitBtn.innerHTML = '登录并导入';
+	}
+
+	// 显示状态消息
+	function showLoginStatus(message, isError = false) {
+		const statusElement = document.getElementById('loginStatus');
+		statusElement.textContent = message;
+		statusElement.classList.remove('hidden', 'text-green-600', 'text-red-600', 'bg-green-100', 'bg-red-100');
+		if (isError) {
+			statusElement.classList.add('text-red-600', 'bg-red-100');
+			// 添加错误动画效果
+			statusElement.classList.add('error-shake');
+			// 动画结束后移除类名
+			setTimeout(() => {
+				statusElement.classList.remove('error-shake');
+			}, 300);
+		} else {
+			statusElement.classList.add('text-green-600', 'bg-green-100');
+		}
+		statusElement.classList.remove('hidden');
+	}
+
+	// 隐藏状态消息
+	function hideLoginStatus() {
+		const statusElement = document.getElementById('loginStatus');
+		statusElement.classList.add('hidden');
+	}
+
+	// 带cookie的fetch封装
+	async function fetchWithCookies(url, options = {}) {
+		// 构建cookie字符串
+		const cookieStr = Object.entries(sessionData.cookies)
+			.map(([name, value]) => `${name}=${encodeURIComponent(value)}`)
+			.join('; ');
+
+		// 添加cookie到请求头
+		const headers = {
+			...options.headers,
+			'Cookie': cookieStr,
+		};
+
+		const response = await fetch(url, {
+			...options,
+			headers,
+			credentials: 'include'
+		});
+
+		// 解析并保存响应中的cookie
+		const setCookieHeaders = response.headers.get('Set-Cookie');
+		if (setCookieHeaders) {
+			setCookieHeaders.split(',').forEach(cookie => {
+				const parts = cookie.trim().split(';')[0].split('=');
+				if (parts.length === 2) {
+					const name = parts[0].trim();
+					const value = parts[1].trim();
+					sessionData.cookies[name] = value;
+				}
+			});
+		}
+
+		return response;
+	}
+
+	/** 
+	 * 提取登录页面指定的隐藏input元素 
+	 * @param {string} html - HTML字符串
+	 * @returns {Object} 包含所有提取字段的键值对 
+	 */ 
+	function extractAuthServerParams(html) { 
+        console.log('=== 开始提取登录参数 ===');
+        console.log('HTML长度:', html ? html.length : 0);
+		
+		// 解析HTML字符串
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(html, 'text/html');
+		
+		// 定义需要从input提取的字段（name属性）
+		const targetFields = [ 
+			{ attr: 'name', value: 'lt' }, 
+			{ attr: 'name', value: 'dllt' }, 
+			{ attr: 'name', value: 'execution' }, 
+			{ attr: 'name', value: '_eventId' }, 
+			{ attr: 'name', value: 'rmShown' }
+		]; 
+ 
+		const result = {}; 
+ 
+		// 遍历目标字段，逐个提取 
+		targetFields.forEach(item => { 
+			let element; 
+			// 根据属性类型（name/id）查找元素 
+			// 先尝试带type="hidden"的选择器
+			element = doc.querySelector(`input[type="hidden"][name="${item.value}"]`); 
+			// 如果找不到，尝试不带type属性的选择器
+			if (!element) {
+				element = doc.querySelector(`input[name="${item.value}"]`); 
+			}
+ 
+			// 提取value值（使用getAttribute更可靠）
+			if (element) {
+				const valueAttr = element.getAttribute('value');
+				result[item.value] = valueAttr || element.value || null;
+				console.log(`  提取字段 ${item.value}: 成功`);
+			} else {
+				result[item.value] = null;
+				console.log(`  提取字段 ${item.value}: 失败（元素未找到）`);
+			}
+		}); 
+ 
+		// 从JavaScript变量中提取pwdDefaultEncryptSalt
+		console.log('从JavaScript变量中提取pwdDefaultEncryptSalt...');
+		const saltMatch = html.match(/var\s+pwdDefaultEncryptSalt\s*=\s*["']([^"']+)["']/);
+		if (saltMatch && saltMatch[1]) {
+			result.pwdDefaultEncryptSalt = saltMatch[1];
+			console.log('  提取字段 pwdDefaultEncryptSalt: 成功');
+		} else {
+			result.pwdDefaultEncryptSalt = null;
+			console.log('  提取字段 pwdDefaultEncryptSalt: 失败（未找到JavaScript变量）');
+		}
+ 
+		console.log('提取的隐藏字段（JSON）:', JSON.stringify(result, null, 2));
+		console.log('=== 提取登录参数结束 ===');
+		
+		// 返回兼容旧格式的结果
+		return {
+			salt: result.pwdDefaultEncryptSalt || '',
+			lt: result.lt || '',
+			execution: result.execution || '',
+			// 额外返回所有字段，方便后续使用
+			allFields: result
+		}; 
+	}
+
+	// authserver同款密码加密（对应fjjx2.py中的_ep）
+	function authserverEncryptPassword(password, salt) {
+		const chars = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678';
+		const randomStr = (len) => {
+			let ret = '';
+			for (let i = 0; i < len; i++) {
+				ret += chars.charAt(Math.floor(Math.random() * chars.length));
+			}
+			return ret;
+		};
+
+		if (!salt) return password;
+		try {
+			const key = CryptoJS.enc.Utf8.parse(salt.trim());
+			const iv = CryptoJS.enc.Utf8.parse(randomStr(16));
+			const encrypted = CryptoJS.AES.encrypt(randomStr(64) + password, key, {
+				iv,
+				mode: CryptoJS.mode.CBC,
+				padding: CryptoJS.pad.Pkcs7
+			});
+			return encrypted.toString();
+		} catch (e) {
+			console.error('authserver密码加密失败，回退明文提交:', e);
+			return password;
+		}
+	}
+
+	// 解析课程数据
+	function parseCourseData(kbList) {
+		return kbList.map(course => ({
+			"星期": course.xqjmc || "",
+			"课程名称": course.kcmc || "",
+			"课程类型": course.kclb || "",
+			"教师": course.xm || "",
+			"场地": course.cdmc || "",
+			"节次": course.jcs || "",
+			"周次": course.zcd || ""
+		}));
+	}
+
+	// 解析周次范围
+	function parseWeekRange(weekStr) {
+		const weekList = [];
+		if (!weekStr) return weekList;
+
+		// 预处理
+		let processed = weekStr.replace(/，/g, ',').replace(/\s/g, '').replace(/周/g, '');
+		const rangeParts = processed.split(',');
+
+		for (const part of rangeParts) {
+			if (!part) continue;
+
+			let isSingle = part.includes('(单)');
+			let isDouble = part.includes('(双)');
+			let purePart = part.replace('(单)', '').replace('(双)', '').trim();
+
+			try {
+				if (!purePart.includes('-')) {
+					// 单周
+					const week = parseInt(purePart);
+					if (week >= 1 && week <= 20) {
+						weekList.push(week);
+					}
+				} else {
+					// 周次范围
+					const [start, end] = purePart.split('-').map(Number);
+					if (start > end || start < 1 || end > 20) continue;
+
+					for (let week = start; week <= end; week++) {
+						if (isSingle && week % 2 !== 1) continue;
+						if (isDouble && week % 2 !== 0) continue;
+						weekList.push(week);
+					}
+				}
+			} catch (e) {
+				console.error('解析周次错误:', e);
+			}
+		}
+
+		// 去重并排序
+		return [...new Set(weekList)].sort((a, b) => a - b);
+	}
+
+	// 按周次统计课程
+	function statCoursesByWeek(courseList) {
+		const weekStat = {};
+		// 初始化1-20周
+		for (let i = 1; i <= 20; i++) {
+			weekStat[i] = [];
+		}
+
+		const weekdayOrder = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"];
+
+		for (const course of courseList) {
+			const courseWeeks = parseWeekRange(course.周次);
+			if (!courseWeeks.length) continue;
+
+			const simpleCourse = {
+				"星期": course.星期,
+				"课程名称": course.课程名称,
+				"节次": course.节次,
+				"教师": course.教师,
+				"场地": course.场地
+			};
+
+			// 添加到对应周次，避免重复
+			for (const week of courseWeeks) {
+				const isDuplicate = weekStat[week].some(c =>
+					c.星期 === simpleCourse.星期 &&
+					c.课程名称 === simpleCourse.课程名称 &&
+					c.节次 === simpleCourse.节次
+				);
+
+				if (!isDuplicate) {
+					weekStat[week].push(simpleCourse);
+				}
+			}
+		}
+
+		// 排序：先按星期，再按节次
+		for (const week in weekStat) {
+			weekStat[week].sort((a, b) => {
+				const weekDayOrderA = weekdayOrder.indexOf(a.星期);
+				const weekDayOrderB = weekdayOrder.indexOf(b.星期);
+
+				if (weekDayOrderA !== weekDayOrderB) {
+					return weekDayOrderA - weekDayOrderB;
+				}
+
+				// 按节次排序
+				const sectionA = parseInt(a.节次.split('-')[0]);
+				const sectionB = parseInt(b.节次.split('-')[0]);
+				return sectionA - sectionB;
+			});
+		}
+
+		return weekStat;
+	}
+
+	// 获取考试信息
+	// 获取考试信息
+	async function fetchExamInfo(schoolYear, semester) {
+		const examUrl = `https://jwxt.fjjxu.edu.cn/jwglxt/kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105`;
+		
+		// 学期值映射：1 -> 3, 2 -> 12
+		const semesterMap = {
+			'1': '3',
+			'2': '12'
+		};
+		const mappedSemester = semesterMap[semester] || semester;
+		
+		// 从 "2025-2026" 格式中提取第一个年份
+		const xnm = schoolYear.split('-')[0];
+		
+		// 构造POST请求的数据
+		const postData = new URLSearchParams();
+		postData.append('xnm', xnm);
+		postData.append('xqm', mappedSemester);
+		postData.append('queryModel.showCount', '5000');
+		
+		// 打印请求体到控制台
+		console.log('考试信息请求URL:', examUrl);
+		console.log('考试信息请求体:', {
+			xnm: xnm,
+			xqm: mappedSemester
+		});
+		console.log('考试信息请求体(URLSearchParams格式):', postData.toString());
+		
+		try {
+			const examResponse = await fetchWithCookies(examUrl, {
+				method: 'POST',
+				mode: 'cors',
+				headers: {
+					'Accept': 'application/json',
+					'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+					...sessionData.headers
+				},
+				body: postData.toString()
+			});
+
+			if (!examResponse.ok) {
+				throw new Error(`获取考试信息失败: ${examResponse.status}`);
+			}
+
+			// 检查响应内容类型
+			const examContentType = examResponse.headers.get('content-type');
+			const examResponseText = await examResponse.text();
+			
+			// 如果返回的是HTML而不是JSON，说明可能未登录或会话过期
+			if (examContentType && examContentType.includes('text/html')) {
+				console.error('服务器返回HTML内容而非JSON:', examResponseText.substring(0, 200));
+				throw new Error('账号或密码输入错了吧');
+			}
+			
+			// 尝试解析JSON
+			let examJson;
+			try {
+				examJson = JSON.parse(examResponseText);
+			} catch (jsonError) {
+				console.error('JSON解析失败，响应内容:', examResponseText.substring(0, 200));
+				throw new Error('服务器响应格式错误');
+			}
+			const examItems = examJson.items || [];
+			
+			// 提取所需字段
+			const examInfo = examItems.map(item => ({
+				kssj: item.kssj,     // 考试时间
+				cdmc: item.cdmc,     // 考点名称
+				kcmc: item.kcmc,     // 考试科目
+				sjbh: item.sjbh,     // 考试性质
+			    xf: item.xf || ''    // 学分
+			}));
+			
+			// 输出到控制台
+			console.log('考试信息:', examInfo);
+			
+			return examInfo;
+		} catch (error) {
+			console.error('获取考试信息错误:', error);
+			return [];
+		}
+	}
+
+	// 获取成绩信息
+	async function fetchGradeInfo(schoolYear, semester) {
+		const gradeUrl = `https://jwxt.fjjxu.edu.cn/jwglxt/cjcx/cjcx_cxXsgrcj.html?doType=query&gnmkdm=N305007`;
+		
+		// 学期值映射：1 -> 3, 2 -> 12
+		const semesterMap = {
+			'1': '3',
+			'2': '12'
+		};
+		const mappedSemester = semesterMap[semester] || semester;
+		
+		// 从 "2025-2026" 格式中提取第一个年份
+		const xnm = schoolYear.split('-')[0];
+		
+		// 构造POST请求的数据
+		const postData = new URLSearchParams();
+		postData.append('xnm', xnm);
+		postData.append('xqm', mappedSemester);
+		postData.append('queryModel.showCount', '5000');
+
+		
+		// 打印请求体到控制台
+		console.log('成绩信息请求URL:', gradeUrl);
+		console.log('成绩信息请求体:', {
+			xnm: xnm,
+			xqm: mappedSemester
+		});
+		console.log('成绩信息请求体(URLSearchParams格式):', postData.toString());
+		
+		try {
+			const gradeResponse = await fetchWithCookies(gradeUrl, {
+				method: 'POST',
+				mode: 'cors',
+				headers: {
+					'Accept': 'application/json',
+					'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+					...sessionData.headers
+				},
+				body: postData.toString()
+			});
+
+			if (!gradeResponse.ok) {
+				throw new Error(`获取成绩信息失败: ${gradeResponse.status}`);
+			}
+
+			// 检查响应内容类型
+			const gradeContentType = gradeResponse.headers.get('content-type');
+			const gradeResponseText = await gradeResponse.text();
+			
+			// 如果返回的是HTML而不是JSON，说明可能未登录或会话过期
+			if (gradeContentType && gradeContentType.includes('text/html')) {
+				console.error('服务器返回HTML内容而非JSON:', gradeResponseText.substring(0, 200));
+				throw new Error('账号或密码输入错了吧');
+			}
+			
+			// 尝试解析JSON
+			let gradeJson;
+			try {
+				gradeJson = JSON.parse(gradeResponseText);
+			} catch (jsonError) {
+				console.error('JSON解析失败，响应内容:', gradeResponseText.substring(0, 200));
+				throw new Error('服务器响应格式错误');
+			}
+			const gradeItems = gradeJson.items || [];
+			
+			// 提取所需字段
+			const gradeInfo = gradeItems.map(item => ({
+				jxb_id: item.jxb_id,   // 教学班ID
+				kcmc: item.kcmc,       // 课程名称
+				cj: item.cj,           // 成绩
+				xf: item.xf || '',     // 学分
+				ksxz: item.ksxz || ''  // 考试性质
+			}));
+			
+			// 输出到控制台
+			console.log('成绩信息:', gradeInfo);
+			
+			return gradeInfo;
+		} catch (error) {
+			console.error('获取成绩信息错误:', error);
+			return [];
+		}
+	}
+
+	// 获取详细成绩信息
+	async function fetchGradeDetail(jxb_id, schoolYear, semester) {
+		const detailUrl = `https://jwxt.fjjxu.edu.cn/jwglxt/cjcx/cjcx_cxXsXmcjList.html?gnmkdm=N305007`;
+		
+		// 学期值映射：1 -> 3, 2 -> 12
+		const semesterMap = {
+			'1': '3',
+			'2': '12'
+		};
+		const mappedSemester = semesterMap[semester] || semester;
+		
+		// 从 "2025-2026" 格式中提取第一个年份
+		const xnm = schoolYear.split('-')[0];
+		
+		// 构造POST请求的数据（与成绩信息请求体一致，只是额外添加jxb_id）
+		const postData = new URLSearchParams();
+		postData.append('xnm', xnm);
+		postData.append('xqm', mappedSemester);
+		postData.append('queryModel.showCount', '5000');
+		postData.append('jxb_id', jxb_id);
+		
+		// 打印请求体到控制台
+		console.log('详细成绩信息请求URL:', detailUrl);
+		console.log('详细成绩信息请求体:', {
+			xnm: xnm,
+			xqm: mappedSemester,
+			jxb_id: jxb_id
+		});
+		console.log('详细成绩信息请求体(URLSearchParams格式):', postData.toString());
+		
+		try {
+			const response = await fetchWithCookies(detailUrl, {
+				method: 'POST',
+				mode: 'cors',
+				headers: {
+					'Accept': 'application/json',
+					'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+					...sessionData.headers
+				},
+				body: postData.toString()
+			});
+			
+			if (!response.ok) {
+				throw new Error(`获取详细成绩失败: ${response.status}`);
+			}
+			
+			// 检查响应内容类型
+			const contentType = response.headers.get('content-type');
+			const responseText = await response.text();
+			
+			// 如果返回的是HTML而不是JSON，说明可能未登录或会话过期
+			if (contentType && contentType.includes('text/html')) {
+				console.error('服务器返回HTML内容而非JSON:', responseText.substring(0, 200));
+				throw new Error('账号或密码输入错了吧');
+			}
+			
+			// 尝试解析JSON
+			let detailJson;
+			try {
+				detailJson = JSON.parse(responseText);
+			} catch (jsonError) {
+				console.error('JSON解析失败，响应内容:', responseText.substring(0, 200));
+				throw new Error('服务器响应格式错误');
+			}
+			return detailJson;
+		} catch (error) {
+			console.error('获取详细成绩错误:', error);
+			return null;
+		}
+	}
+
+	// 显示详细成绩信息
+	async function showGradeDetail(jxb_id, category, element) {
+		// 获取中部提示信息元素
+		const centerMsg = element.querySelector('.grade-center-msg');
+		
+		// 显示加载状态
+		centerMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span class="text-sm font-medium">加载中...</span>';
+		
+		try {
+			// 获取当前学年和学期信息
+			const gradeDataStr = localStorage.getItem('jwxt_grade_info');
+			let schoolYear = '';
+			let semester = '';
+			
+			if (gradeDataStr) {
+				const gradeData = JSON.parse(gradeDataStr);
+				schoolYear = gradeData.schoolYear || '';
+				semester = gradeData.semester || '';
+			}
+			
+			if (!schoolYear || !semester) {
+				centerMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> 缺少学年或学期信息';
+				return;
+			}
+			
+			// 获取详细成绩数据
+			const detailData = await fetchGradeDetail(jxb_id, schoolYear, semester);
+			
+			if (!detailData || !detailData.items || detailData.items.length === 0) {
+				centerMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> <span class="text-sm">token失效请重新登录获取</span>';
+				return;
+			}
+			
+			// 提取平时成绩和考试成绩
+			let平时成绩 = '未找到';
+			let考试成绩 = '未找到';
+			let总评成绩 = '未找到';
+			
+			detailData.items.forEach(item => {
+				if (item.xmblmc === '平时(40%)' && item.xmcj) {
+					平时成绩 = item.xmcj;
+				} else if (item.xmblmc === '期末(60%)' && item.xmcj) {
+					考试成绩 = item.xmcj;
+				} else if (item.xmblmc === '总评' && item.xmcj) {
+					总评成绩 = item.xmcj;
+				}
+			});
+			
+			// 在中部显示详细成绩
+			centerMsg.innerHTML = `<span class="text-sm">平时：${平时成绩} 期末：${考试成绩} 总评：${总评成绩}</span>`;
+			centerMsg.classList.remove('opacity-70');
+			
+			// 移除点击事件
+			element.removeAttribute('onclick');
+			element.classList.remove('cursor-pointer', 'hover:opacity-90', 'transition-opacity');
+			
+			// 保存详细成绩到本地存储
+			const gradeDetails = JSON.parse(localStorage.getItem('jwxt_grade_details') || '{}');
+			gradeDetails[jxb_id] = {
+				平时成绩:平时成绩,
+				考试成绩:考试成绩,
+				总评成绩:总评成绩,
+				timestamp: new Date().toISOString()
+			};
+			localStorage.setItem('jwxt_grade_details', JSON.stringify(gradeDetails));
+		} catch (error) {
+			console.error('显示详细成绩错误:', error);
+			centerMsg.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> 获取详细成绩失败';
+		}
+	}
+
+	// 处理网络登录和课表导入
+	async function handleNetworkLogin() {
+		const username = document.getElementById('loginUsername').value.trim();
+		const password = document.getElementById('loginPassword').value.trim();
+		const rememberPassword = document.getElementById('rememberPassword').checked;
+		// 学年和学期将从网络获取，这里先从localStorage读取作为备用
+		let schoolYear = localStorage.getItem('jwxt_school_year') || '';
+		let semester = localStorage.getItem('jwxt_semester') || '';
+
+		console.log('=== 开始登录流程 ===');
+		console.log('用户名:', username);
+		console.log('密码长度:', password.length);
+		console.log('记住密码:', rememberPassword);
+
+		if (!username || !password) {
+			showLoginStatus('请输入用户名和密码', true);
+			return;
+		}
+
+		// 保存用户名到本地存储
+		localStorage.setItem('jwxt_username', username);
+
+		// 根据用户选择决定是否保存密码
+		if (rememberPassword) {
+			// 为了安全，我们保存密码的加密版本
+			localStorage.setItem('jwxt_password', btoa(password)); // 使用base64编码保存
+			localStorage.setItem('jwxt_remember', 'true');
+		} else {
+			// 如果用户不选择记住密码，清除已保存的密码
+			localStorage.removeItem('jwxt_password');
+			localStorage.setItem('jwxt_remember', 'false');
+		}
+
+		showLoginLoading('正在登录...');
+		hideLoginStatus();
+
+		try {
+			// 尝试从localStorage恢复上次保存的cookies
+			const savedCookies = localStorage.getItem('jwxt_cookies');
+			if (savedCookies) {
+				try {
+					sessionData.cookies = JSON.parse(savedCookies);
+					console.log('已恢复上次的cookies');
+				} catch (e) {
+					console.warn('恢复cookies失败:', e);
+					sessionData.cookies = {};
+				}
+			} else {
+				sessionData.cookies = {};
+			}
+
+			// 0. 先访问logout URL，取消上次会话的有效性
+			console.log('步骤0: 注销上次会话');
+			showLoginLoading('正在注销上次会话...');
+			try {
+				const logoutUrl = 'https://ehall.fjjxu.edu.cn/logout?service=https://ehall.fjjxu.edu.cn/new/index.html';
+				await fetchWithCookies(logoutUrl, {
+					method: 'GET',
+					mode: 'cors'
+				});
+				console.log('上次会话已注销');
+			} catch (logoutError) {
+				console.warn('注销上次会话失败（继续登录）:', logoutError);
+			}
+
+			// 清空旧会话cookie缓存，开始新的登录流程
+			sessionData.cookies = {};
+
+			const AUTH_SERVER_DOMAIN = 'https://authserver.fjjxu.edu.cn';
+			const EHALL_DOMAIN = 'https://ehall.fjjxu.edu.cn';
+			const authLoginPageUrl ='https://authserver.fjjxu.edu.cn/authserver/login?service=https%3A%2F%2Fehall.fjjxu.edu.cn%2Flogin%3Fservice%3Dhttps%3A%2F%2Fehall.fjjxu.edu.cn%2Fnew%2Findex.html';
+
+			// 1. 获取authserver登录页并提取salt/lt/execution
+			console.log('步骤1: 获取authserver登录页参数');
+			showLoginLoading('正在获取登录参数...');
+			const authPageResp = await fetchWithCookies(authLoginPageUrl, {
+				method: 'GET',
+				mode: 'cors'
+			});
+			if (!authPageResp.ok) {
+				throw new Error(`获取authserver登录页失败: ${authPageResp.status}`);
+			}
+			const authPageHtml = await authPageResp.text();
+			const {
+				salt,
+				lt,
+				execution,
+				allFields
+			} = extractAuthServerParams(authPageHtml);
+			console.log('auth参数（JSON）:', JSON.stringify({
+				hasSalt: !!salt,
+				saltLength: salt ? salt.length : 0,
+				lt,
+				execution,
+				allFields
+			}, null, 2));
+			
+			// 详细的错误检查
+			const missingParams = [];
+			if (!salt) missingParams.push('pwdDefaultEncryptSalt');
+			if (!lt) missingParams.push('lt');
+			if (!execution) missingParams.push('execution');
+			
+			if (missingParams.length > 0) {
+				const errorMsg = `登录页面参数提取失败，缺少: ${missingParams.join(', ')}`;
+				console.error(errorMsg);
+				console.error('所有提取的字段:', JSON.stringify(allFields, null, 2));
+				throw new Error(errorMsg);
+			}
+
+			// 2. 使用fjjx2.py同款算法加密密码并提交登录
+			console.log('步骤2: 提交authserver登录');
+			const encryptedPassword = authserverEncryptPassword(password, salt);
+			const authLoginData = new URLSearchParams();
+			authLoginData.append('username', username);
+			authLoginData.append('password', encryptedPassword);
+			authLoginData.append('lt', lt);
+			authLoginData.append('dllt', allFields.dllt || 'userNamePasswordLogin');
+			authLoginData.append('execution', execution);
+			authLoginData.append('_eventId', allFields._eventId || 'submit');
+			authLoginData.append('rmShown', allFields.rmShown || '1');
+
+			const authPostResp = await fetchWithCookies(
+				`${AUTH_SERVER_DOMAIN}/authserver/login?service=${encodeURIComponent('https://ehall.fjjxu.edu.cn/login?service=https://ehall.fjjxu.edu.cn/new/index.html')}`, {
+					method: 'POST',
+					mode: 'cors',
+					headers: {
+						'Content-Type': 'application/x-www-form-urlencoded',
+						'Origin': AUTH_SERVER_DOMAIN,
+						...sessionData.headers
+					},
+					body: authLoginData.toString()
+				}
+			);
+
+			if (!authPostResp.ok) {
+				throw new Error(`authserver登录失败: ${authPostResp.status}`);
+			}
+			const authPostHtml = await authPostResp.text();
+			if (authPostHtml.includes('用户名或密码错误') || authPostHtml.includes('请重新输入')) {
+				throw new Error('用户名或密码不正确，请重新输入！');
+			}
+
+			// 3. 用已登录会话访问jwxt sso入口，获取ticket并完成跳转
+			console.log('步骤3: 获取jwxt sso票据');
+			const jwxtSsoEntry =
+				`${AUTH_SERVER_DOMAIN}/authserver/login?service=${encodeURIComponent('https://jwxt.fjjxu.edu.cn/sso/jznewsixlogin')}`;
+			const ssoResp = await fetchWithCookies(jwxtSsoEntry, {
+				method: 'GET',
+				mode: 'cors'
+			});
+			if (!ssoResp.ok) {
+				throw new Error(`获取jwxt票据失败: ${ssoResp.status}`);
+			}
+			const ssoHtml = await ssoResp.text();
+			const ticketMatch = ssoHtml.match(/href="(https:\/\/jwxt\.fjjxu\.edu\.cn\/sso\/jznewsixlogin\?ticket=[^"]+)"/i);
+			const ticketUrl = ticketMatch ? ticketMatch[1] : null;
+			if (ticketUrl) {
+				await fetchWithCookies(ticketUrl, {
+					method: 'GET',
+					mode: 'cors'
+				});
+			}
+
+			// 4. 最后补一次jwxt入口访问，确保会话落地
+			console.log('步骤4: 激活jwxt会话');
+			await fetchWithCookies('https://jwxt.fjjxu.edu.cn/sso/jznewsixlogin', {
+				method: 'GET',
+				mode: 'cors'
+			});
+
+			console.log('登录成功!');
+
+			// 保存cookies到localStorage，供下次登录时注销使用
+			if (Object.keys(sessionData.cookies).length > 0) {
+				localStorage.setItem('jwxt_cookies', JSON.stringify(sessionData.cookies));
+				console.log('已保存cookies到本地存储');
+			}
+
+			// 获取开学日期信息
+			showLoginLoading('正在获取学期信息...');
+			const semesterInfoUrl = 'https://jwxt.fjjxu.edu.cn/jwglxt/xtgl/index_cxAreaFive.html?localeKey=zh_CN&gnmkdm=index';
+			const semesterInfoResponse = await fetchWithCookies(semesterInfoUrl, {
+				method: 'GET',
+				mode: 'cors',
+				headers: {
+					...sessionData.headers
+				}
+			});
+
+			if (!semesterInfoResponse.ok) {
+				console.warn('获取学期信息失败，使用用户选择的学期和开学日期');
+			} else {
+				const semesterInfoHtml = await semesterInfoResponse.text();
+				// 提取学期和开学日期信息
+				const semesterPattern = /(\d{4}-\d{4})学年(\d)学期\((\d{4}-\d{2}-\d{2})至\d{4}-\d{2}-\d{2}\)/;
+				const match = semesterInfoHtml.match(semesterPattern);
+				if (match) {
+					const extractedSchoolYear = match[1];
+					const extractedSemester = match[2];
+					const extractedStartDate = match[3];
+					
+					console.log('提取到的学期信息:');
+					console.log('  学年:', extractedSchoolYear);
+					console.log('  学期:', extractedSemester);
+					console.log('  开学日期:', extractedStartDate);
+					
+					// 更新学期和开学日期
+					schoolYear = extractedSchoolYear;
+					semester = extractedSemester;
+					
+					// 保存到localStorage
+					localStorage.setItem('jwxt_school_year', schoolYear);
+					localStorage.setItem('jwxt_semester', semester);
+					localStorage.setItem('jwxt_start_date', extractedStartDate);
+					
+					console.log('学期和开学日期已自动更新');
+				} else {
+					console.warn('未找到学期信息，使用用户选择的学期和开学日期');
+				}
+			}
+
+			// 登录成功，获取课程数据
+			showLoginLoading('正在获取课程数据...');
+
+			// 学期值映射：1 -> 3, 2 -> 12
+			const semesterMap = {
+				'1': '3',
+				'2': '12'
+			};
+			const mappedSemester = semesterMap[semester] || semester;
+			
+			// 从 "2025-2026" 格式中提取第一个年份
+			const xnm = schoolYear.split('-')[0];
+			console.log('课表请求参数 - xnm:', xnm, 'xqm:', mappedSemester);
+
+			const kcUrl =
+				`https://jwxt.fjjxu.edu.cn/jwglxt/kbcx/xskbcx_cxXsKb.html?gnmkdm=N2151&xnm=${xnm}&xqm=${mappedSemester}`;
+
+			const courseResponse = await fetchWithCookies(kcUrl, {
+				method: 'GET',
+				mode: 'cors',
+				headers: {
+					'Accept': 'application/json',
+					...sessionData.headers
+				}
+			});
+
+			if (!courseResponse.ok) {
+				throw new Error(`获取课程数据失败: ${courseResponse.status}`);
+			}
+
+			// 检查响应内容类型
+			const courseContentType = courseResponse.headers.get('content-type');
+			const courseResponseText = await courseResponse.text();
+			
+			// 如果返回的是HTML而不是JSON，说明可能未登录或会话过期
+			if (courseContentType && courseContentType.includes('text/html')) {
+				console.error('服务器返回HTML内容而非JSON:', courseResponseText.substring(0, 200));
+				throw new Error('账号或密码输入错了吧');
+			}
+			
+			// 尝试解析JSON
+			let courseJson;
+			try {
+				courseJson = JSON.parse(courseResponseText);
+				console.log('课程数据响应:', courseJson);
+			} catch (jsonError) {
+				console.error('JSON解析失败，响应内容:', courseResponseText.substring(0, 500));
+				throw new Error('服务器响应格式错误');
+			}
+			
+			// 检查courseJson是否为null
+			if (!courseJson) {
+				console.error('课程数据为null，完整响应:', courseResponseText);
+				throw new Error('课程数据为空');
+			}
+			
+			const kbList = courseJson.kbList || [];
+
+			if (!kbList.length) {
+				throw new Error('未找到课程数据');
+			}
+
+			// 解析课程数据
+			const allCourses = parseCourseData(kbList);
+
+			// 按周次统计课程
+			const weekStats = statCoursesByWeek(allCourses);
+
+			// 保存到localStorage
+			// 修复：直接保存 weekStats 而不是包装在对象中
+			localStorage.setItem('courseData', JSON.stringify(weekStats));
+
+			// 保存周次统计数据到本地存储
+			const statsData = {
+				timestamp: new Date().toISOString(),
+				schoolYear: schoolYear,
+				semester: semester,
+				weekStats: weekStats
+			};
+
+			localStorage.setItem('jwxt_week_stats', JSON.stringify(statsData));
+			console.log('周次统计数据已保存到本地存储');
+
+			// 获取考试信息
+			const examInfo = await fetchExamInfo(schoolYear, semester);
+			
+			// 保存考试信息到localStorage
+			const examData = {
+				timestamp: new Date().toISOString(),
+				schoolYear: schoolYear,
+				semester: semester,
+				examInfo: examInfo
+			};
+			localStorage.setItem('jwxt_exam_info', JSON.stringify(examData));
+			console.log('考试信息已保存到本地存储:', examInfo);
+
+			// 获取成绩信息
+			const gradeInfo = await fetchGradeInfo(schoolYear, semester);
+			
+			// 保存成绩信息到localStorage
+			const gradeData = {
+				timestamp: new Date().toISOString(),
+				schoolYear: schoolYear,
+				semester: semester,
+				gradeInfo: gradeInfo
+			};
+			localStorage.setItem('jwxt_grade_info', JSON.stringify(gradeData));
+			console.log('成绩信息已保存到本地存储:', gradeInfo);
+
+			showLoginStatus('课程数据导入成功', false);
+
+			// 使用从网络获取的开学日期
+			const savedStartDate = localStorage.getItem('jwxt_start_date');
+			if (savedStartDate) {
+				let date = new Date(savedStartDate);
+				// 将开学日期调整为该周的周一
+				const dayOfWeek = date.getDay();
+				const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+				date.setDate(date.getDate() + daysToMonday);
+				
+				// 保存调整后的周一日期用于计算
+				localStorage.setItem('startDate', date.toISOString().split('T')[0]);
+				// 同时更新全局的startDate变量
+				startDate = date;
+				console.log('开学日期已设置:', savedStartDate, '调整为周一:', date.toISOString().split('T')[0]);
+			}
+
+			// 关闭登录模态框
+			setTimeout(() => {
+				closeLoginModal();
+
+				// 刷新课程表显示
+				if (typeof initializeSchedule === 'function') {
+					initializeSchedule();
+				}
+
+				// 显示成功提示
+				if (typeof showDynamicIsland === 'function') {
+					showDynamicIsland('数据导入成功');
+				}
+
+				// 关闭灵动岛
+				if (typeof toggleIslandExpand === 'function') {
+					setTimeout(() => {
+						toggleIslandExpand();
+					}, 500);
+				}
+			}, 1000);
+
+		} catch (error) {
+			console.error('登录错误:', error);
+			console.error('错误堆栈:', error.stack);
+			showLoginStatus(error.message || '登录失败，请重试', true);
+		} finally {
+			hideLoginLoading();
+		}
+	}
+</script>
+
+
+<script>
+	// 在页面适当位置添加重置按钮
+	const resetBtn = document.createElement('button');
+	resetBtn.textContent = '陷阱';
+	resetBtn.style.position = 'fixed';
+	resetBtn.style.top = '15px';
+	resetBtn.style.right = '20px';
+	resetBtn.style.zIndex = '9999';
+
+	// 全透明隐形状态设置
+	resetBtn.style.opacity = '0'; // 完全透明（0-1之间，0是全透明，1是不透明）
+	resetBtn.style.backgroundColor = 'transparent'; // 背景色透明
+	resetBtn.style.color = 'transparent'; // 文字颜色透明
+	resetBtn.style.border = 'none'; // 移除边框（确保没有边框显示）
+	// 保留点击功能的同时保持隐形
+	resetBtn.style.padding = '3px 20px';
+	resetBtn.style.borderRadius = '12px';
+	// 可选：鼠标悬停时临时显示（如果需要）
+	resetBtn.onmouseover = () => {
+		resetBtn.style.opacity = '0.8'; // 悬停时稍微显示
+		resetBtn.style.backgroundColor = '#000000';
+		resetBtn.style.color = 'white';
+	};
+	resetBtn.onmouseout = () => {
+		resetBtn.style.opacity = '0'; // 离开后恢复全透明
+		resetBtn.style.backgroundColor = 'transparent';
+		resetBtn.style.color = 'transparent';
+	};
+	resetBtn.addEventListener('click', () => {
+		localStorage.removeItem('hasUsedSchedule');
+		window.location.reload(); // 添加页面重新加载功能
+	});
+	document.body.appendChild(resetBtn);
+	// 显示模态框的通用函数
+	function showModal(content, isWelcomeModal = false) {
+		// 确保模态框先显示再添加动画类
+		const courseModal = document.getElementById('courseModal');
+		if (courseModal) {
+			courseModal.style.display = 'flex';
+			// 使用requestAnimationFrame确保DOM更新后再应用动画
+			requestAnimationFrame(() => {
+				courseModal.classList.add('active');
+				courseModal.classList.remove('closing');
+			});
+		}
+
+		// 设置弹窗内容
+		modalContent.innerHTML = content;
+
+		// 如果是欢迎弹窗，添加特殊标记
+		if (isWelcomeModal) {
+			const modalElement = document.getElementById('courseModal');
+			modalElement.setAttribute('data-is-welcome-modal', 'true');
+			modalElement.setAttribute('data-click-count', '0');
+		}
+	}
+
+	// 显示首次使用欢迎弹窗
+	function showWelcomeModal() {
+		const welcomeContent = `
+                    <div>
+                        <h3 class="text-xl font-bold text-neutral-800 text-center">欢迎使用福建财经政法大学课表</h3>
+                        <p class="text-neutral-600 text-center">制作不易，可以的话请作者喝杯可乐吧！</p>
+                    </div>                    
+                    <div class="flex justify-center items-center">
+                        <img src="img/1.png" alt="欢迎使用课程表" class="max-w-full h-auto rounded-lg" />
+                    </div>
+				    <div>
+				        <p class="text-neutral-600 text-center">加入QQ群获取更新信息：1048514300</p>
+				    </div>
+            `;
+		showModal(welcomeContent, true);
+	}
+
+	// 切换功能
+	const viewToggleBtn = document.getElementById('viewToggleBtn');
+	const listViewContainer = document.getElementById('listViewContainer');
+	const excelViewContainer = document.getElementById('excelViewContainer');
+
+	viewToggleBtn.addEventListener('click', () => {
+		listViewContainer.classList.toggle('hidden');
+		excelViewContainer.classList.toggle('hidden');
+
+		if (listViewContainer.classList.contains('hidden')) {
+			viewToggleBtn.innerHTML = '<i class="fa-solid fa-list"></i><span>列表</span>';
+			// 当切换到表格视图时，确保显示的是课程数据而不是考试数据
+			updateScheduleDisplay();
+			// 清除保存的视图状态
+			localStorage.removeItem('lastView');
+			// 重置考试视图和成绩视图标志
+			window.isExamView = false;
+			window.isGradeView = false;
+		} else {
+			viewToggleBtn.innerHTML = '<i class="fa-solid fa-table-cells-large"></i><span>表格</span>';
+			// 检查列表视图中是否显示的是考试信息
+			const listContainer = listViewContainer.querySelector('section');
+			if (listContainer && !listContainer.querySelector('h2')?.textContent?.includes('考试安排')) {
+				// 如果不是考试信息，则更新课程数据显示
+				updateScheduleDisplay();
+				// 清除保存的视图状态
+				localStorage.removeItem('lastView');
+				// 重置考试视图和成绩视图标志
+				window.isExamView = false;
+				window.isGradeView = false;
+			} else if (listContainer && listContainer.querySelector('h2')?.textContent?.includes('考试安排')) {
+				// 如果是考试信息，保存状态
+				localStorage.setItem('lastView', 'exam');
+			}
+		}
+
+		// 确保在视图切换后能正确处理滑动事件
+		setTimeout(() => {
+			// 重新绑定滑动事件
+			addSwipeEvents();
+		}, 100);
+	});
+
+	// 课程弹窗功能
+	const courseModal = document.getElementById('courseModal');
+	const modalContent = document.getElementById('modalContent');
+
+	// 关闭弹窗
+	courseModal.addEventListener('click', (e) => {
+		if (e.target === courseModal) {
+			// 检查是否为首次进入弹窗
+			const isWelcomeModal = courseModal.getAttribute('data-is-welcome-modal') === 'true';
+			if (isWelcomeModal) {
+				// 获取当前点击次数
+				let clickCount = parseInt(courseModal.getAttribute('data-click-count') || '0');
+				clickCount++;
+				courseModal.setAttribute('data-click-count', clickCount.toString());
+
+				// 只有点击5次才关闭弹窗并标记为已使用
+				if (clickCount >= 3) {
+					localStorage.setItem('hasUsedSchedule', 'true');
+					closeCourseModal();
+					// 重置标记
+					courseModal.removeAttribute('data-is-welcome-modal');
+					courseModal.removeAttribute('data-click-count');
+				}
+			} else {
+				// 普通弹窗直接关闭
+				localStorage.setItem('hasUsedSchedule', 'true');
+				closeCourseModal();
+			}
+		}
+	});
+
+	// 键盘ESC键关闭模态框
+	document.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape' && courseModal.classList.contains('active')) {
+			closeCourseModal();
+		}
+	});
+
+	// 关闭课程模态框
+	function closeCourseModal() {
+		const courseModal = document.getElementById('courseModal');
+		if (courseModal) {
+			// 添加关闭动画类，触发向下生长回灵动岛的动画
+			courseModal.classList.add('closing');
+			courseModal.classList.remove('active');
+
+			// 等待动画结束后隐藏元素 - 与CSS动画时间保持一致
+			setTimeout(() => {
+				courseModal.style.display = 'none';
+				courseModal.classList.remove('closing');
+			}, 300); // 与CSS动画时间一致
+		}
+	}
+
+	// 显示课程详情
+	function showCourseDetails(course) {
+		// 设置弹窗内容
+		const courseContent = `
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 rounded-[15px] bg-course-${course.category} flex items-center justify-center text-white mr-4 flex-shrink-0">
+                            <i class="fas fa-graduation-cap text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold text-neutral-800 mb-1">${course.name}</h3>
+                            ${course.additional ? `<span class="bg-neutral-100 text-neutral-600 text-xs px-3 py-1 rounded-[10px]">
+                                ${course.additional}
+                            </span>` : ''}
+                        </div>
+                    </div>
+                    <button class="close-btn text-neutral-400 hover:text-neutral-600 transition-colors p-2 -m-2" onclick="closeCourseModal()">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <!-- 上课地点和上课时间并排 -->
+                    <div class="flex gap-4">
+                        <!-- 地点信息 -->
+                        <div class="flex-1 flex flex-col items-center p-4 rounded-xl bg-gradient-to-br from-course-${course.category}/5 to-course-${course.category}/10 border border-course-${course.category}/10 text-center">
+                            <div class="w-10 h-10 rounded-[10px] bg-course-${course.category}/20 flex items-center justify-center text-course-${course.category} mb-2">
+                                <i class="fas fa-map-marker-alt"></i>
+                            </div>
+                            <div class="text-sm text-neutral-500 mb-1">地点</div>
+                            <div class="font-semibold text-neutral-800 break-words text-center">${course.location}</div>
+                        </div>
+                        
+                        <!-- 时间信息 -->
+                        <div class="flex-1 flex flex-col items-center p-4 rounded-xl bg-gradient-to-br from-course-${course.category}/5 to-course-${course.category}/10 border border-course-${course.category}/10 text-center">
+                            <div class="w-10 h-10 rounded-[10px] bg-course-${course.category}/20 flex items-center justify-center text-course-${course.category} mb-2">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="text-sm text-neutral-500 mb-1">时间</div>
+                            <div class="font-semibold text-neutral-800 break-words text-center">${course.time}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 授课教师和星期并排 -->
+                    <div class="flex gap-4">
+                        <div class="flex-1 flex items-start p-4 rounded-xl bg-gradient-to-br from-course-${course.category}/5 to-course-${course.category}/10 border border-course-${course.category}/10">
+                            <div class="w-10 h-10 rounded-[10px] bg-course-${course.category}/20 flex items-center justify-center text-course-${course.category} mr-3 mt-[5px] flex-shrink-0">
+                              <i class="fa-solid fa-person-chalkboard"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm text-neutral-500 mb-1">教师</div>
+                                <div class="font-semibold text-neutral-800">${course.teacher}</div>
+                            </div>
+                        </div>
+                        
+                        ${course.weekday ? `
+                        <div class="flex-1 flex items-start p-4 rounded-xl bg-gradient-to-br from-course-${course.category}/5 to-course-${course.category}/10 border border-course-${course.category}/10">
+                            <div class="w-10 h-10 rounded-[10px] bg-course-${course.category}/20 flex items-center justify-center text-course-${course.category} mr-3 mt-[5px] flex-shrink-0">
+                                <i class="fas fa-calendar-day"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm text-neutral-500 mb-1">星期</div>
+                                <div class="font-semibold text-neutral-800">${course.weekday}</div>
+                            </div>
+                        </div>
+                        ` : `
+                        <div class="flex-1"></div>
+                        `}
+                    </div>
+                    
+                    ${course.status ? `
+                    <!-- 课程状态 -->
+                    <div class="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-[10px] bg-blue-100 flex items-center justify-center text-blue-600 mr-3 flex-shrink-0">
+                                <i class="fas fa-info-circle"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm text-blue-600 mb-1">课程状态</div>
+                                <div class="font-semibold text-blue-800">${course.status}</div>
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+		showModal(courseContent);
+	}
+
+
+
+	// 今天按钮功能
+	const todayBtn = document.getElementById('todayBtn');
+	if (todayBtn) {
+		todayBtn.addEventListener('click', () => {
+			const atomLoadingModal = document.getElementById('atomLoadingModal');
+
+			// 显示原子动画加载效果
+			if (atomLoadingModal) {
+				atomLoadingModal.style.display = 'flex';
+				// 使用requestAnimationFrame确保动画顺畅
+				requestAnimationFrame(() => {
+					atomLoadingModal.classList.add('active');
+				});
+
+				// 开始显示登录状态信息
+				setTimeout(() => {
+					showLoginStatus();
+				}, 500); // 稍微延迟一下开始显示状态
+			}
+
+			console.log('刷新课程数据，显示原子动画');
+
+			// 8秒后隐藏动画并执行刷新功能（6条消息 × 1.3秒/条 ≈ 8秒）
+			setTimeout(() => {
+				// 隐藏原子动画
+				if (atomLoadingModal) {
+					atomLoadingModal.classList.remove('active');
+					// 在动画结束后隐藏元素
+					setTimeout(() => {
+						atomLoadingModal.style.display = 'none';
+					}, 300);
+				}
+
+				// 执行刷新功能
+				refreshSchedule();
+
+				// 滚动到今日课程
+				const todayElement = document.querySelector('.date-item.today');
+				if (todayElement) {
+					// 稍微延迟执行滚动，确保DOM已经更新
+					setTimeout(() => {
+						// 使用自定义的贝塞尔曲线动画效果替代默认的平滑滚动
+						customScrollToElement(todayElement);
+					}, 100);
+				}
+			}, 8000); // 显示8秒
+		});
+	}
+
+	// 绑定课程点击事件
+	function bindCourseClickEvents() {
+		document.querySelectorAll('.course-card, .course-cell').forEach(card => {
+			card.removeEventListener('click', handleCourseClick); // 先移除旧事件
+			card.addEventListener('click', handleCourseClick);
+		});
+	}
+
+	// 课程点击处理函数
+	function handleCourseClick(event) {
+		const courseDataAttr = event.currentTarget.getAttribute('data-course');
+		if (courseDataAttr) {
+			try {
+				const courseData = JSON.parse(courseDataAttr);
+				showCourseDetails(courseData);
+			} catch (error) {
+				console.error('解析课程数据失败:', error);
+			}
+		}
+	}
+
+	// 通用刷新函数
+	function refreshSchedule() {
+		loadCourseData();
+		generateDates();
+		renderDateSlider(true);
+		updateScheduleDisplay();
+	}
+
+	// 初始化时绑定静态课程卡片事件
+	document.addEventListener('DOMContentLoaded', () => {
+		bindCourseClickEvents();
+
+		// 检查并应用配色方案
+		if (!checkAndApplyColorScheme()) {
+			// 如果没有重新加载，确保保存当前应用的配色方案
+			const currentPalette = getCoursePaletteFromStorage();
+			if (currentPalette) {
+				localStorage.setItem('lastAppliedPalette', JSON.stringify(currentPalette));
+			}
+		}
+
+		// 检查是否首次使用，如果是则显示欢迎弹窗
+		const hasUsedSchedule = localStorage.getItem('hasUsedSchedule');
+		if (!hasUsedSchedule) {
+			// 延迟显示欢迎弹窗，让页面完全加载
+			setTimeout(() => {
+				showWelcomeModal();
+			}, 1000);
+		}
+		
+		// 绑定考试按钮事件
+		const examBtn = document.getElementById('examBtn');
+		if (examBtn) {
+			examBtn.addEventListener('click', showExamInfo);
+		}
+		
+		// 检查是否应该自动显示考试信息
+		const lastView = localStorage.getItem('lastView');
+		if (lastView === 'exam') {
+			// 延迟执行以确保DOM完全加载
+			setTimeout(showExamInfo, 500);
+		}
+		
+		// 初始化时重置考试视图标志
+		window.isExamView = false;
+	});
+	
+	// 显示成绩信息
+	function showGradeInfo() {
+		try {
+			// 从localStorage获取成绩信息
+			const gradeDataStr = localStorage.getItem('jwxt_grade_info');
+			if (!gradeDataStr) {
+				alert('暂无成绩信息，请先导入课程数据');
+				return;
+			}
+			
+			const gradeData = JSON.parse(gradeDataStr);
+			let gradeInfo = gradeData.gradeInfo || [];
+			
+			// 按照成绩从高到低排序
+			gradeInfo.sort((a, b) => {
+				// 处理空值或无效值
+				const scoreA = parseFloat(a.cj) || -1;
+				const scoreB = parseFloat(b.cj) || -1;
+				
+				// 从高到低排序
+				return scoreB - scoreA;
+			});
+			
+			// 获取列表容器
+			const listViewContainer = document.getElementById('listViewContainer');
+			const listContainer = listViewContainer.querySelector('section');
+			
+			if (!listContainer) {
+				console.error('未找到列表容器');
+				return;
+			}
+			
+			// 构建成绩信息卡片内容，模仿课程卡片的样式
+			let htmlContent = `<h2 class="text-2xl font-semibold mb-3 text-center text-white">考试成绩</h2>`;
+			
+			if (gradeInfo.length === 0) {
+				htmlContent += `
+					<div class="empty-state-container flex flex-col items-center justify-center py-8">
+						<i class="fa-solid fa-circle-exclamation text-5xl text-gray-500 mb-4"></i>
+						<p class="text-gray-300 text-lg">暂无成绩信息</p>
+					</div>
+				`;
+			} else {
+				// 为成绩信息使用顺序循环的配色方案
+				// 获取配色方案
+				const coursePalette = getCoursePaletteFromStorage();
+				
+				// 为每个成绩创建卡片
+				gradeInfo.forEach((grade, index) => {
+					// 使用顺序循环的方式获取颜色类别
+					const colorIndex = (index % 5) + 1; // 循环使用1-5的颜色
+					const category = `color${colorIndex}`;
+					
+					// 检查本地存储中是否有详细成绩
+					const gradeDetails = JSON.parse(localStorage.getItem('jwxt_grade_details') || '{}');
+					const hasDetail = grade.jxb_id && gradeDetails[grade.jxb_id];
+					
+					let gradeCard;
+					if (hasDetail) {
+						// 已获取过详细成绩，直接显示
+						gradeCard = `
+								<div class="course-card bg-course-${category} text-white border-l-4 border-course-${category}/80 relative overflow-hidden mb-4">
+									<div class="absolute inset-0 bg-gradient-to-r from-course-${category} to-course-${category}/80"></div>
+									<div class="relative z-10 p-4 h-32">
+										<!-- 四个角落的信息 -->
+										<div class="absolute top-3 left-3">
+											<h3 class="font-semibold text-wrap text-xl">${grade.kcmc || '未知科目'}</h3>
+										</div>
+										<div class="absolute top-3 right-3">
+											<span class="text-3xl font-bold whitespace-nowrap ${(parseFloat(grade.cj) < 60 && grade.cj !== '未公布') ? 'text-red-500' : ''}">${grade.cj || '未公布'}</span>
+										</div>
+										<div class="absolute bottom-3 left-3 flex items-center">
+											<span>${grade.ksxz || '未知性质'}</span>
+										</div>
+										<div class="absolute bottom-3 right-3 text-right">
+											<span>${grade.xf || '0'}学分</span>
+										</div>
+										<!-- 中部详细成绩信息 -->
+										<div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-sm whitespace-nowrap">
+											平时:${gradeDetails[grade.jxb_id].平时成绩}&nbsp;&nbsp;&nbsp;&nbsp;期末:${gradeDetails[grade.jxb_id].考试成绩}&nbsp;&nbsp;&nbsp;&nbsp;总评:${gradeDetails[grade.jxb_id].总评成绩}
+										</div>
+									</div>
+								</div>
+							`;
+					} else {
+						// 未获取过详细成绩，显示点击按钮
+						gradeCard = `
+								<div class="course-card bg-course-${category} text-white border-l-4 border-course-${category}/80 relative overflow-hidden mb-4 cursor-pointer hover:opacity-90 transition-opacity"
+									onclick="showGradeDetail('${grade.jxb_id}', '${category}', this)">
+									<div class="absolute inset-0 bg-gradient-to-r from-course-${category} to-course-${category}/80"></div>
+									<div class="relative z-10 p-4 h-32">
+										<!-- 四个角落的信息 -->
+										<div class="absolute top-3 left-3">
+											<h3 class="font-semibold text-wrap text-xl">${grade.kcmc || '未知科目'}</h3>
+										</div>
+										<div class="absolute top-3 right-3">
+											<span class="text-3xl font-bold whitespace-nowrap ${(parseFloat(grade.cj) < 60 && grade.cj !== '未公布') ? 'text-red-500' : ''}">${grade.cj || '未公布'}</span>
+										</div>
+										<div class="absolute bottom-3 left-3 flex items-center">
+											<span>${grade.ksxz || '未知性质'}</span>
+										</div>
+										<div class="absolute bottom-3 right-3 text-right">
+											<span>${grade.xf || '0'}学分</span>
+										</div>
+										<!-- 中部提示信息 -->
+										<div class="text-sm grade-center-msg absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xs opacity-70 whitespace-nowrap">
+											点击查看详细成绩
+										</div>
+									</div>
+									<!-- 详细成绩信息区域（隐藏） -->
+									<div class="grade-detail hidden relative z-10 p-4 bg-white/10 backdrop-blur-sm rounded-[14px]">
+										<div class="loading-indicator text-center py-2 rounded-[24px]">
+											<i class="fa-solid fa-spinner fa-spin"></i> 加载中...
+										</div>
+									</div>
+								</div>
+							`;
+					}
+					
+					htmlContent += gradeCard;
+				});
+			}
+			
+			// 将成绩信息添加到列表容器中
+			listContainer.innerHTML = htmlContent;
+			
+			// 切换到列表视图
+			document.getElementById('listViewContainer').classList.remove('hidden');
+			document.getElementById('excelViewContainer').classList.add('hidden');
+			
+			// 更新视图状态
+			const viewToggleBtn = document.getElementById('viewToggleBtn');
+			if (viewToggleBtn) {
+				viewToggleBtn.innerHTML = '<i class="fa-solid fa-table-cells-large"></i><span>表格</span>';
+			}
+			
+			// 添加滑动事件监听器，支持在考试信息和成绩信息之间切换
+			addSwipeEvents();
+			
+			// 应用保存的课程名称和场地文字字体大小到成绩信息
+			syncGradeInfoFontSize();
+			
+			// 添加一个标志，表示当前处于成绩信息视图
+			window.isGradeView = true;
+			// 确保不在考试视图中
+			window.isExamView = false;
+		} catch (error) {
+			console.error('显示成绩信息失败:', error);
+			alert('显示成绩信息失败，请重试');
+		}
+	}
+	
+
+	
+	// 显示考试信息
+	function showExamInfo() {
+		try {
+			// 保存当前视图为考试信息视图
+			localStorage.setItem('lastView', 'exam');
+			
+			// 从localStorage获取考试信息
+			const examDataStr = localStorage.getItem('jwxt_exam_info');
+			if (!examDataStr) {
+				alert('暂无考试信息，请先导入课程数据');
+				return;
+			}
+			
+			const examData = JSON.parse(examDataStr);
+			let examInfo = examData.examInfo || [];
+			
+			// 获取列表容器
+			const listViewContainer = document.getElementById('listViewContainer');
+			const listContainer = listViewContainer.querySelector('section');
+			
+			if (!listContainer) {
+				console.error('未找到列表容器');
+				return;
+			}
+			
+			// 对考试信息按kssj参数进行排序
+			examInfo = sortExamInfo(examInfo);
+			
+			// 构建考试信息卡片内容，模仿课程卡片的样式
+			let htmlContent = `<h2 class="text-2xl font-semibold mb-3 text-center text-white">考试日程</h2>`;
+			
+			if (examInfo.length === 0) {
+				htmlContent += `
+					<div class="empty-state-container flex flex-col items-center justify-center py-8">
+						<i class="fa-solid fa-circle-exclamation text-5xl text-gray-500 mb-4"></i>
+						<p class="text-gray-300 text-lg">暂无考试信息</p>
+					</div>
+				`;
+			} else {
+				// 为考试信息使用顺序循环的配色方案
+				// 获取配色方案
+				const coursePalette = getCoursePaletteFromStorage();
+				
+				// 为每个考试创建卡片
+				examInfo.forEach((exam, index) => {
+					// 使用顺序循环的方式获取颜色类别
+					const colorIndex = (index % 5) + 1; // 循环使用1-5的颜色
+					const category = `color${colorIndex}`;
+					
+					const examCard = `
+						<div class="course-card bg-course-${category} text-white border-l-4 border-course-${category}/80 relative overflow-hidden mb-4">
+							<div class="absolute inset-0 bg-gradient-to-r from-course-${category} to-course-${category}/80"></div>
+							<div class="relative z-10 p-4 h-32">
+								<!-- 四个角落的信息 -->
+								<div class="absolute top-3 left-3 exam-subject-container">
+									<h3 class="font-semibold text-xl whitespace-nowrap">${(exam.kcmc || '未知科目').substring(0, 8)}</h3>
+								</div>
+								<div class="absolute top-3 right-3 text-right">
+									<span class="text-lg font-medium whitespace-nowrap">${exam.kssj || '未安排'}</span>
+								</div>
+								<div class="absolute bottom-3 left-3 flex items-center">
+									<i class="fas fa-graduation-cap mr-1"></i>
+									<span>${exam.xf || '0'}学分</span>
+								</div>
+								<div class="absolute bottom-3 right-3 text-right">
+									<span class="flex items-center"><i class="fas fa-map-marker-alt mr-1"></i>${exam.cdmc || '未安排'}</span>
+								</div>
+								<!-- 考试性质居中显示，纯文字无背景 -->
+								<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+									<span class="text-sm font-medium text-white">${exam.sjbh || '未知'}</span>
+								</div>
+							</div>
+						</div>
+					`;
+					
+					htmlContent += examCard;
+				});
+			}
+			
+			// 将考试信息添加到列表容器中
+			listContainer.innerHTML = htmlContent;
+			
+			// 切换到列表视图
+			document.getElementById('listViewContainer').classList.remove('hidden');
+			document.getElementById('excelViewContainer').classList.add('hidden');
+			
+			// 更新视图状态
+			const viewToggleBtn = document.getElementById('viewToggleBtn');
+			if (viewToggleBtn) {
+				viewToggleBtn.innerHTML = '<i class="fa-solid fa-table-cells-large"></i><span>表格</span>';
+			}
+			
+			// 不再绑定点击事件，使考试卡片不可点击
+			
+			// 添加滑动事件监听器，支持在考试信息和成绩信息之间切换
+			addSwipeEvents();
+			
+			// 应用保存的课程名称和场地文字字体大小到考试信息
+			syncExamInfoFontSize();
+			
+			// 添加一个标志，表示当前处于考试信息视图
+			window.isExamView = true;
+			// 确保不在成绩视图中
+			window.isGradeView = false;
+		} catch (error) {
+			console.error('显示考试信息失败:', error);
+			alert('显示考试信息失败，请重试');
+		}
+	}
+	
+	// 考试信息排序函数
+	function sortExamInfo(examInfo) {
+		// 过滤掉kssj为"未放开不可查"的考试信息
+		const validExams = examInfo.filter(exam => exam.kssj && exam.kssj !== "未放开不可查");
+		
+		// 如果有效考试信息少于2个，则不进行排序，原样返回
+		if (validExams.length < 2) {
+			return examInfo;
+		}
+		
+		// 对有效的考试信息按日期和时间排序
+		validExams.sort((a, b) => {
+			// 提取日期部分进行比较
+			const dateA = a.kssj.split('(')[0]; // 获取括号前的日期部分
+			const dateB = b.kssj.split('(')[0]; // 获取括号前的日期部分
+			
+			// 先按日期排序
+			const dateComparison = new Date(dateA) - new Date(dateB);
+			if (dateComparison !== 0) {
+				return dateComparison;
+			}
+			
+			// 如果日期相同，按时间段排序
+			// 提取括号内的时间部分
+			const timeA = a.kssj.match(/\((.*?)\)/);
+			const timeB = b.kssj.match(/\((.*?)\)/);
+			
+			if (timeA && timeB) {
+				// 获取开始时间进行比较（取括号内时间的前半部分，如08:20-10:00中的08:20）
+				const startTimeA = timeA[1].split('-')[0];
+				const startTimeB = timeB[1].split('-')[0];
+				
+				// 转换时间为分钟数进行比较
+				const [hoursA, minutesA] = startTimeA.split(':').map(Number);
+				const [hoursB, minutesB] = startTimeB.split(':').map(Number);
+				const totalMinutesA = hoursA * 60 + minutesA;
+				const totalMinutesB = hoursB * 60 + minutesB;
+				
+				return totalMinutesA - totalMinutesB;
+			}
+			
+			return 0;
+		});
+		
+		// 将无效的考试信息（kssj为"未放开不可查"）放在最后
+		const invalidExams = examInfo.filter(exam => !exam.kssj || exam.kssj === "未放开不可查");
+		
+		// 合并排序后的有效考试信息和无效考试信息
+		return [...validExams, ...invalidExams];
+	}	
+</script>
+</html>

@@ -1,9 +1,10 @@
 # 福建财经政法大学课表
 
-一款专为福建财经政法大学学生设计的课表查询应用，提供简洁高效的课程管理体验。
-<img width="378" height="667" alt="image" src="https://github.com/user-attachments/assets/745e133f-1b69-47a9-aa61-2a9e1e98ab00" />
-<img width="377" height="663" alt="image" src="https://github.com/user-attachments/assets/70c20c49-e905-454a-a85c-54a9e2e30271" />
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS-green.svg)
+![Version](https://img.shields.io/badge/version-202639-orange.svg)
 
+一款专为福建江夏学院学生设计的课表查询应用，提供简洁高效的课程管理体验。
 
 ## ✨ 功能特点
 
@@ -29,7 +30,7 @@
 ## 🛠️ 技术栈
 
 | 分类 | 技术 |
-| :------- | :------------------------ |
+| :--- | :--- |
 | **框架** | uni-app (H5+ App) |
 | **UI框架** | Tailwind CSS 3 |
 | **图标库** | Font Awesome 5 |
@@ -40,27 +41,28 @@
 ## 📦 安装使用
 
 ### 📥 直接安装（推荐）
+
 1. 访问 [Releases](https://github.com/GUY-ATM/福建财经政法大学课表/releases) 页面
 2. 下载最新版本的 APK 文件
 3. 在 Android 设备上安装并打开应用
 4. 首次使用请导入课程表
 
 ### 🔧 从源码构建
+
 #### 环境要求
 - **HBuilderX**：版本 3.0+
 - **Node.js**：版本 14.0+（可选，用于扩展开发）
 
-#### 克隆仓库
+#### 构建步骤
+
 ```bash
-# 中文仓库地址
+# 1. 克隆仓库
 git clone https://github.com/GUY-ATM/福建财经政法大学课表.git
-构建步骤
-bash
-运行
-# 1. 使用 HBuilderX 打开项目
+
+# 2. 使用 HBuilderX 打开项目
 # 打开 HBuilderX → 文件 → 打开目录 → 选择项目文件夹
 
-# 2. 运行项目
+# 3. 运行项目
 # 方法一：运行到浏览器
 # 工具栏 → 运行 → 运行到浏览器 → 选择浏览器
 
@@ -69,8 +71,11 @@ bash
 
 # 方法三：云打包（生成 APK）
 # 工具栏 → 发行 → 原生App-云打包 → Android → 填写配置 → 打包
-📁 项目结构
-plaintext
+```
+
+## 📁 项目结构
+
+```
 福建财经政法大学课表/
 ├── kebiao.html           # 主页面（课表展示）
 ├── kebiao1.html          # 课程详情页面
@@ -105,9 +110,13 @@ plaintext
     ├── release/apk/      # APK 安装包（发布用）
     ├── cache/            # 缓存文件（已忽略）
     └── resources/        # 资源文件（已忽略）
-⚙️ 配置说明
-manifest.json 关键配置
-json
+```
+
+## ⚙️ 配置说明
+
+### manifest.json 关键配置
+
+```json
 {
     "name": "大学课表",
     "description": "福建财经政法大学课表",
@@ -120,9 +129,13 @@ json
         "navigationBar": { "hidden": true }   // 隐藏导航栏
     }
 }
-配色方案配置
-应用支持自定义课程配色，配色数据存储在 localStorage 的 course 键中：
-json
+```
+
+### 配色方案配置
+
+应用支持自定义课程配色，配色数据存储在 `localStorage` 的 `course` 键中：
+
+```json
 {
     "color1": "#66ccff",
     "color2": "#66e0c0",
@@ -130,21 +143,33 @@ json
     "color4": "#ccb3ff",
     "color5": "#60A5FA"
 }
-🤝 贡献指南
+```
+
+## 🤝 贡献指南
+
 欢迎提交 Issue 和 Pull Request！
-开发规范
-请遵循项目现有的代码风格
-提交代码前请确保功能正常
-代码注释使用中文
-提交规范
-feat: 添加新功能
-fix: 修复 bug
-docs: 更新文档
-style: 代码格式调整
-refactor: 重构代码
-📜 许可证
-本项目采用 MIT 许可证 - 查看 LICENSE 文件了解详情
-📞 联系方式
-项目地址：https://github.com/GUY-ATM/ 福建财经政法大学课表
-问题反馈：请提交 Issue
-注意：本应用仅供福建江夏学院学生学习交流使用，请勿用于商业用途。
+
+### 开发规范
+1. 请遵循项目现有的代码风格
+2. 提交代码前请确保功能正常
+3. 代码注释使用中文
+
+### 提交规范
+- `feat`: 添加新功能
+- `fix`: 修复 bug
+- `docs`: 更新文档
+- `style`: 代码格式调整
+- `refactor`: 重构代码
+
+## 📜 许可证
+
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
+
+## 📞 联系方式
+
+- **项目地址**：https://github.com/GUY-ATM/福建财经政法大学课表
+- **问题反馈**：请提交 [Issue](https://github.com/GUY-ATM/福建财经政法大学课表/issues)
+
+---
+
+**注意**：本应用仅供福建江夏学院学生学习交流使用，请勿用于商业用途。

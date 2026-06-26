@@ -1,0 +1,23 @@
+# HBuilder构建产物
+unpackage/cache/
+unpackage/resources/
+
+# 保留release目录用于发布
+!unpackage/release/
+
+# 临时文件
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# IDE配置
+.hbuilderx/
+.vscode/
+.idea/
+
+# 敏感文件
+*.keystore
+*.jks
+.env
+.env.local

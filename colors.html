@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5色配色方案可视化</title>
+    <script src="libs/tailwindcss.js"></script>
+    <link rel="stylesheet" href="libs/css/all.min.css">
+    
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#6366F1',
+                        neutral: '#64748B',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .color-block {
+                @apply w-full h-40 md:h-56 rounded-lg transition-all duration-300 ease-in-out shadow-md hover:shadow-xl hover:scale-[1.02] cursor-pointer;
+            }
+            .palette-container {
+                @apply bg-white rounded-xl shadow-lg p-4 md:p-6 transition-all duration-300 hover:shadow-xl;
+            }
+            .default-palette {
+                @apply border-2 border-primary;
+            }
+            .custom-palette {
+                @apply border-2 border-secondary;
+            }
+            .color-code {
+                @apply text-sm md:text-base font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300;
+            }
+            .select-btn {
+                @apply px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center;
+            }
+            .select-btn-not-selected {
+                @apply bg-gray-100 text-gray-700 hover:bg-primary hover:text-white border border-gray-200;
+            }
+            .select-btn-selected {
+                @apply bg-primary text-white border border-primary;
+            }
+            .select-btn-disabled {
+                @apply bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300;
+            }
+            .selected-indicator {
+                @apply absolute -top-2 -right-2 bg-secondary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-800">
+    <!-- 顶部导航 -->
+    <header class="bg-white fixed top-0 left-0 right-0 z-50 transition-all duration-300">
+        <div class="container mx-auto px-4 py-0 flex justify-center mt-8 mb-1 items-center gap-4">
+            <button id="backBtn" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 flex items-center transition-all duration-200" style="border-radius: 12px;" onclick="window.location.href='kebiao.html'">
+                <i class="fa fa-arrow-left mr-2"></i>返回
+            </button>
+            <button id="wallpaperBtn" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 flex items-center transition-all duration-200" style="border-radius: 12px;" onclick="window.location.href='wallpaper.html'">
+                <i class="fa-solid fa-image mr-2"></i>壁纸
+            </button>
+            <button id="randomBtn" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 flex items-center transition-all duration-200" style="border-radius: 12px;">
+                <i class="fa fa-random mr-2"></i>随机
+            </button>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 pt-16 pb-4">
+        <!-- 介绍部分 -->
+        <section class="text-center mt-4 max-w-3xl mx-auto">
+            <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold mb-4 text-gray-800">不拒本心 是谓自在</h2>
+        </section>
+        
+        <!-- 自定义配色区 -->
+        <section class="mb-10">
+            <div class="palette-container custom-palette">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-lg font-semibold text-gray-700">
+                        随心配色
+                        <span id="customCount" class="ml-2 text-sm text-gray-500">(已选择 <span>0</span>/5 种颜色)</span>
+                    </h3>
+                    <button id="saveCustomBtn" class="select-btn select-btn-disabled">
+                        <i class="fa fa-save mr-1"></i>保存
+                    </button>
+                </div>
+                <div id="customPalette" class="grid grid-cols-5 gap-2 min-h-[120px]">
+                    <!-- 自定义颜色块将在这里显示 -->
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400">点击添加颜色</div>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400">点击添加颜色</div>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400">点击添加颜色</div>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400">点击添加颜色</div>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400">点击添加颜色</div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 配色方案展示区 -->
+        <section id="palettesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+            <!-- 配色方案将通过JavaScript动态生成 -->
+        </section>
+    </main>
+
+    <!-- 提示框 -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center">
+        <i class="fa fa-check-circle mr-2"></i>
+        <span>操作成功</span>
+    </div>
+
+    <script>
+        // 定义固定的默认配色方案
+        const defaultPalette = [
+			'#ff99cc',  // 粉色（适中饱和度）
+			'#66e0c0',  // 绿色（平衡鲜艳度）
+            '#66ccff',  // 蓝色（比浅色版深，比原版浅）    
+            '#ccb3ff',  // 紫色（柔和且清晰）
+            '#60A5FA'  //蓝色（温暖不刺眼）
+
+        ];
+        
+        // 生成其他配色方案（默认包含默认方案）
+        let colorPalettes = [
+            defaultPalette,
+			// 粉紫柔和
+			['#FDF2F8', '#FCE7F3', '#FBCFE8', '#F472B6', '#EC4899'],
+			// 暖橙色调
+			['#FFF7ED', '#FFEDD5', '#FED7AA', '#FDBA74', '#FB923C'],
+			// 温暖棕调
+			['#FEF3C7', '#FDE68A', '#FCD34D', '#FBBF24', '#F59E0B'],
+			// 淡雅绿调
+			['#ECFDF5', '#D1FAE5', '#A7F3D0', '#6EE7B7', '#34D399'],
+			// 薄荷绿调
+			['#F0FDF4', '#DCFCE7', '#BBF7D0', '#86EFAC', '#4ADE80'],
+            // 青蓝渐变
+            ['#EFF6FF', '#DBEAFE', '#BFDBFE', '#93C5FD', '#60A5FA'],
+			// 柔和蓝调
+			['#E0F2FE', '#BAE6FD', '#7DD3FC', '#38BDF8', '#0EA5E9'],
+            // 淡紫灰调
+            ['#F5F3FF', '#EDE9FE', '#DDD6FE', '#C4B5FD', '#A78BFA'],
+			// 灰白中性
+			['#F9FAFB', '#F3F4F6', '#E5E7EB', '#9CA3AF', '#4B5563']
+        ];
+
+        // 存储自定义选择的颜色
+        let customColors = [];
+
+        // DOM元素
+        const palettesContainer = document.getElementById('palettesContainer');
+        const toast = document.getElementById('toast');
+        const randomBtn = document.getElementById('randomBtn');
+        const customPalette = document.getElementById('customPalette');
+        const saveCustomBtn = document.getElementById('saveCustomBtn');
+        const customCount = document.getElementById('customCount').querySelector('span');
+
+        // 初始化页面
+        function init() {
+            renderPalettes(colorPalettes);
+            updateCustomPaletteDisplay();
+            setupEventListeners();
+        }
+
+        // 渲染配色方案
+        function renderPalettes(palettes) {
+            palettesContainer.innerHTML = '';
+            
+            // 获取当前选中的方案
+            const selectedCourse = getSelectedCoursePalette();
+            
+            palettes.forEach((palette, index) => {
+                const isSelected = selectedCourse && 
+                    selectedCourse.color1 === palette[0] &&
+                    selectedCourse.color2 === palette[1] &&
+                    selectedCourse.color3 === palette[2] &&
+                    selectedCourse.color4 === palette[3] &&
+                    selectedCourse.color5 === palette[4];
+                
+                const isDefault = index === 0; // 第一个方案是默认方案
+                
+                const paletteElement = document.createElement('div');
+                paletteElement.className = `palette-container relative ${isDefault ? 'default-palette' : ''}`;
+                paletteElement.dataset.index = index;
+                
+                let paletteHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-lg font-semibold text-gray-700">
+                            ${isDefault ? '默认配色' : `配色方案 #${index}`}
+                            ${isSelected ? '<span class="ml-2 text-green-500 text-sm"><i class="fa fa-check-circle"></i> 已选择</span>' : ''}
+                        </h3>
+                        <button class="select-btn ${isSelected ? 'select-btn-selected' : 'select-btn-not-selected'}" 
+                                data-index="${index}">
+                            <i class="fa ${isSelected ? 'fa-check' : 'fa-plus'} mr-1"></i>
+                            ${isSelected ? '已选择' : '选择'}
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-5 gap-2">
+                `;
+                
+                // 生成颜色块
+                palette.forEach(color => {
+                    // 计算文本颜色（黑或白）以确保可读性
+                    const textColor = isLightColor(color) ? '#000000' : '#FFFFFF';
+                    // 检查是否在自定义颜色中
+                    const isInCustom = customColors.includes(color);
+                    const position = isInCustom ? customColors.indexOf(color) + 1 : '';
+                    
+                    paletteHTML += `
+                        <div class="group relative" data-color="${color}">
+                            <div class="color-block" style="background-color: ${color}"></div>
+                            <div class="color-code absolute bottom-2 left-1/2 transform -translate-x-1/2" style="color: ${textColor}">
+                                ${color}
+                            </div>
+                            ${isInCustom ? `<div class="selected-indicator">${position}</div>` : ''}
+                        </div>
+                    `;
+                });
+                
+                paletteHTML += `</div>`;
+                paletteElement.innerHTML = paletteHTML;
+                palettesContainer.appendChild(paletteElement);
+            });
+        }
+
+        // 更新自定义配色展示
+        function updateCustomPaletteDisplay() {
+            customPalette.innerHTML = '';
+            customCount.textContent = customColors.length;
+            
+            // 显示已选择的颜色
+            for (let i = 0; i < 5; i++) {
+                if (i < customColors.length) {
+                    const color = customColors[i];
+                    const textColor = isLightColor(color) ? '#000000' : '#FFFFFF';
+                    
+                    customPalette.innerHTML += `
+                        <div class="relative group" data-color="${color}">
+                            <div class="w-full h-full rounded-lg" style="background-color: ${color}"></div>
+                            <div class="absolute top-1 right-1 text-white bg-gray-800/70 hover:bg-gray-800 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer remove-color">
+                                <i class="fa fa-times text-xs"></i>
+                            </div>
+                            <div class="color-code absolute bottom-2 left-1/2 transform -translate-x-1/2" style="color: ${textColor}">
+                                ${color}
+                            </div>
+                            <div class="selected-indicator">${i + 1}</div>
+                        </div>
+                    `;
+                } else {
+                    // 空位置
+                    customPalette.innerHTML += `
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400">
+                            配色
+                        </div>
+                    `;
+                }
+            }
+            
+            // 更新保存按钮状态
+            if (customColors.length === 5) {
+                saveCustomBtn.classList.remove('select-btn-disabled');
+                saveCustomBtn.classList.add('select-btn-not-selected');
+            } else {
+                saveCustomBtn.classList.remove('select-btn-not-selected');
+                saveCustomBtn.classList.add('select-btn-disabled');
+            }
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 颜色块点击事件（复制或添加到自定义）
+            palettesContainer.addEventListener('click', (e) => {
+                const colorBlock = e.target.closest('.group');
+                if (colorBlock && colorBlock.dataset.color) {
+                    const color = colorBlock.dataset.color;
+                    
+                    // 如果还没选满5个，添加到自定义配色
+                    if (customColors.length < 5 && !customColors.includes(color)) {
+                        customColors.push(color);
+                        updateCustomPaletteDisplay();
+                        renderPalettes(colorPalettes); // 重新渲染以显示选中标记
+                        showToast(`已添加到自定义配色 (${customColors.length}/5)`);
+                    } else if (customColors.includes(color)) {
+                        // 从自定义配色中移除
+                        customColors = customColors.filter(c => c !== color);
+                        updateCustomPaletteDisplay();
+                        renderPalettes(colorPalettes);
+                        showToast(`已从自定义配色中移除`);
+                    } else {
+                        // 已经选满5个，直接复制
+                        copyToClipboard(color);
+                        showToast(`已复制: ${color}`);
+                    }
+                    return;
+                }
+            });
+            
+            // 自定义配色区移除颜色
+            customPalette.addEventListener('click', (e) => {
+                const removeBtn = e.target.closest('.remove-color');
+                if (removeBtn) {
+                    const colorBlock = removeBtn.closest('.group');
+                    const color = colorBlock.dataset.color;
+                    customColors = customColors.filter(c => c !== color);
+                    updateCustomPaletteDisplay();
+                    renderPalettes(colorPalettes);
+                    showToast(`已从自定义配色中移除`);
+                }
+            });
+            
+            // 保存自定义配色
+            saveCustomBtn.addEventListener('click', () => {
+                if (customColors.length === 5) {
+                    const coursePalette = {
+                        color1: customColors[0],
+                        color2: customColors[1],
+                        color3: customColors[2],
+                        color4: customColors[3],
+                        color5: customColors[4]
+                    };
+                    
+                    localStorage.setItem('course', JSON.stringify(coursePalette));
+                    showToast('已保存自定义配色方案');
+                }
+            });
+            
+            // 选择按钮点击事件
+            palettesContainer.addEventListener('click', (e) => {
+                const selectBtn = e.target.closest('.select-btn');
+                if (selectBtn) {
+                    const index = parseInt(selectBtn.dataset.index);
+                    const selectedCourse = getSelectedCoursePalette();
+                    
+                    // 检查当前是否已选择该方案
+                    const isCurrentlySelected = selectedCourse && 
+                        selectedCourse.color1 === colorPalettes[index][0] &&
+                        selectedCourse.color2 === colorPalettes[index][1] &&
+                        selectedCourse.color3 === colorPalettes[index][2] &&
+                        selectedCourse.color4 === colorPalettes[index][3] &&
+                        selectedCourse.color5 === colorPalettes[index][4];
+                    
+                    if (isCurrentlySelected) {
+                        // 取消选择
+                        localStorage.removeItem('course');
+                        showToast('已取消选择该配色方案');
+                    } else {
+                        // 按指定格式保存选中的配色方案
+                        const coursePalette = {
+                            color1: colorPalettes[index][0],
+                            color2: colorPalettes[index][1],
+                            color3: colorPalettes[index][2],
+                            color4: colorPalettes[index][3],
+                            color5: colorPalettes[index][4]
+                        };
+                        
+                        localStorage.setItem('course', JSON.stringify(coursePalette));
+                        showToast(`已选择${index === 0 ? '默认' : `配色 #${index}`}`);
+                    }
+                    
+                    // 重新渲染以更新状态
+                    renderPalettes(colorPalettes);
+                }
+            });
+            
+            // 随机生成新的配色方案（保留默认方案）
+            randomBtn.addEventListener('click', () => {
+                const newPalettes = [defaultPalette]; // 始终保留默认方案作为第一个
+                // 再生成9个新的配色方案，加上默认方案共10个
+                for (let i = 0; i < 9; i++) {
+                    newPalettes.push(generateHarmoniousPalette());
+                }
+                colorPalettes = newPalettes;
+                
+                // 检查当前选择是否是默认方案，如果是则保留选择状态
+                const selectedCourse = getSelectedCoursePalette();
+                if (selectedCourse && !isDefaultPalette(selectedCourse)) {
+                    localStorage.removeItem('course');
+                }
+                
+                renderPalettes(colorPalettes);
+                
+                // 添加动画效果
+                const palettes = document.querySelectorAll('.palette-container');
+                palettes.forEach((palette, index) => {
+                    // 默认方案不添加动画
+                    if (index === 0) return;
+                    
+                    palette.style.opacity = '0';
+                    palette.style.transform = 'translateY(20px)';
+                    setTimeout(() => {
+                        palette.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                        palette.style.opacity = '1';
+                        palette.style.transform = 'translateY(0)';
+                    }, 50 * (index - 1));
+                });
+                
+                showToast('已生成新的配色方案（保留默认方案）');
+            });
+        }
+
+        // 检查是否为默认配色方案
+        function isDefaultPalette(palette) {
+            return palette.color1 === defaultPalette[0] &&
+                   palette.color2 === defaultPalette[1] &&
+                   palette.color3 === defaultPalette[2] &&
+                   palette.color4 === defaultPalette[3] &&
+                   palette.color5 === defaultPalette[4];
+        }
+
+        // 获取当前选中的course配色方案
+        function getSelectedCoursePalette() {
+            const courseStr = localStorage.getItem('course');
+            return courseStr ? JSON.parse(courseStr) : null;
+        }
+
+        // 复制到剪贴板
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).catch(err => {
+                console.error('无法复制文本: ', err);
+            });
+        }
+
+        // 显示提示框
+        function showToast(message) {
+            const toastText = toast.querySelector('span');
+            toastText.textContent = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+                
+                // 如果是选择配色方案的提示，500ms后跳转到课表界面
+                if (message.includes('已选择') || message.includes('已保存自定义')) {
+                    setTimeout(() => {
+                        window.location.href = 'kebiao.html';
+                    }, 500);
+                }
+            }, 700);
+        }
+
+        // 判断颜色亮度（用于确定文本颜色）
+        function isLightColor(hexColor) {
+            // 去掉#号
+            const hex = hexColor.replace('#', '');
+            
+            // 解析RGB值
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            
+            // 计算亮度（使用相对 luminance 公式）
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            
+            // 如果亮度大于0.5，则认为是浅色
+            return luminance > 0.5;
+        }
+
+        // 生成和谐的配色方案
+        function generateHarmoniousPalette() {
+            // 随机选择一个主色调（偏向柔和色调）
+            const hue = Math.floor(Math.random() * 360);
+            const baseSaturation = 30 + Math.random() * 40; // 30-70%
+            const baseLightness = 70 + Math.random() * 20;  // 70-90% 偏向柔和
+            
+            const palette = [];
+            
+            // 生成5个协调的颜色
+            for (let i = 0; i < 5; i++) {
+                // 基于主色调生成协调色（类似色或互补色）
+                let currentHue;
+                if (i === 0) {
+                    currentHue = hue; // 主色调
+                } else if (i % 2 === 0) {
+                    currentHue = (hue + 30 * (i/2)) % 360; // 类似色
+                } else {
+                    currentHue = (hue + 180) % 360; // 互补色
+                }
+                
+                // 调整饱和度和亮度，确保柔和
+                const saturation = Math.max(10, Math.min(70, baseSaturation + (Math.random() * 20 - 10)));
+                const lightness = Math.max(50, Math.min(90, baseLightness + (Math.random() * 30 - 15)));
+                
+                // 转换为十六进制
+                const hexColor = hslToHex(currentHue, saturation, lightness);
+                palette.push(hexColor);
+            }
+            
+            return palette;
+        }
+
+        // HSL转十六进制
+        function hslToHex(h, s, l) {
+            h /= 360;
+            s /= 100;
+            l /= 100;
+            
+            let r, g, b;
+            
+            if (s === 0) {
+                r = g = b = l; // 灰度
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+                
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            
+            const toHex = (x) => {
+                const hex = Math.round(x * 255).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            };
+            
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
