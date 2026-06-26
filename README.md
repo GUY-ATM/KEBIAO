@@ -49,6 +49,7 @@
 - **Node.js**：版本 14.0+（可选，用于扩展开发）
 
 #### 构建步骤
+```
 # 1. 克隆仓库
 git clone https://github.com/GUY-ATM/福建财经政法大学课表.git
 
@@ -64,8 +65,9 @@ git clone https://github.com/GUY-ATM/福建财经政法大学课表.git
 
 # 方法三：云打包（生成安卓 APK 安装包）
 # 工具栏 → 发行 → 原生App-云打包 → Android → 填写配置 → 打包
-
+```
 📁 项目结构
+```
 plaintext
 福建财经政法大学课表/
 ├── kebiao.html           # 主页面（课表展示）
@@ -101,7 +103,9 @@ plaintext
     ├── release/apk/      # APK 安装包（发布用）
     ├── cache/            # 缓存文件（已忽略）
     └── resources/        # 资源文件（已忽略）
+```
 ⚙️ 配置说明
+```
 manifest.json 关键配置
 json
 {
@@ -116,8 +120,10 @@ json
         "navigationBar": { "hidden": true }   // 隐藏导航栏
     }
 }
+```
 配色方案配置
 应用支持自定义课程配色，配色数据存储在 localStorage 的 course 键中：
+```
 json
 {
     "color1": "#66ccff",
@@ -126,7 +132,7 @@ json
     "color4": "#ccb3ff",
     "color5": "#60A5FA"
 }
-
+```
 🤝 贡献指南
 欢迎提交 Issue 和 Pull Request！
 开发规范
