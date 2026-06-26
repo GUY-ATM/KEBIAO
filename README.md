@@ -1,2 +1,151 @@
-# 2026-
-一款适配办事大厅的正方教务课表及考试信息查询app
+# 福建财经政法大学课表
+
+![License](https://shields.io.cn/badge/license-MIT-blue.svg)
+![Platform](https://shields.io.cn/badge/platform-Android%20%7C%20iOS-green.svg)
+![Version](https://shields.io.cn/badge/version-202639-orange.svg)
+
+一款专为**福建江夏学院（福建财经政法大学）**学生设计的课表查询应用，提供简洁高效的课程管理体验。
+
+## ✨ 功能特点
+
+### 📅 课程展示
+- **周视图课表**：直观展示每周课程安排，支持滑动切换周次
+- **课程详情**：点击课程查看详细信息（教室、教师、课程代码）
+- **日期滑轨**：顶部日期导航，快速切换查看不同日期课程
+
+### 🎨 个性化定制
+- **自定义配色**：支持5种课程颜色方案，打造专属课表风格
+- **沉浸式界面**：全屏沉浸式设计，状态栏自动适配
+- **壁纸设置**：支持自定义背景壁纸，美化课表界面
+
+### 🔐 安全特性
+- **数据加密**：使用 CryptoJS 和 JSEncrypt 对敏感数据进行加密存储
+- **本地存储**：课程数据保存在本地，保护个人隐私
+
+### 📱 便捷功能
+- **离线使用**：无需网络即可查看课表
+- **跨平台支持**：同时支持 Android 和 iOS 设备
+- **响应式设计**：适配不同屏幕尺寸的设备
+
+## 🛠️ 技术栈
+
+| 分类 | 技术 |
+| :------- | :------------------------ |
+| **框架** | uni-app (H5+ App) |
+| **UI框架** | Tailwind CSS 3 |
+| **图标库** | Font Awesome 5 |
+| **加密库** | CryptoJS, JSEncrypt |
+| **构建工具** | HBuilderX |
+| **开发语言** | HTML5 + CSS3 + JavaScript |
+
+## 📦 安装使用
+
+### 📥 直接安装（推荐）
+1. 访问 [Releases](https://github.com/GUY-ATM/福建财经政法大学课表/releases) 页面
+2. 下载最新版本的 APK 文件
+3. 在 Android 设备上安装并打开应用
+4. 首次使用请导入课程表
+
+### 🔧 从源码构建
+#### 环境要求
+- **HBuilderX**：版本 3.0+
+- **Node.js**：版本 14.0+（可选，用于扩展开发）
+
+#### 克隆仓库
+```bash
+# 中文仓库地址
+git clone https://github.com/GUY-ATM/福建财经政法大学课表.git
+构建步骤
+bash
+运行
+# 1. 使用 HBuilderX 打开项目
+# 打开 HBuilderX → 文件 → 打开目录 → 选择项目文件夹
+
+# 2. 运行项目
+# 方法一：运行到浏览器
+# 工具栏 → 运行 → 运行到浏览器 → 选择浏览器
+
+# 方法二：运行到手机（需要 USB 连接）
+# 工具栏 → 运行 → 运行到手机或模拟器 → 选择设备
+
+# 方法三：云打包（生成 APK）
+# 工具栏 → 发行 → 原生App-云打包 → Android → 填写配置 → 打包
+📁 项目结构
+plaintext
+福建财经政法大学课表/
+├── kebiao.html           # 主页面（课表展示）
+├── kebiao1.html          # 课程详情页面
+├── colors.html           # 配色方案设置页面
+├── wallpaper.html        # 壁纸设置页面
+├── manifest.json         # 应用配置文件（关键配置）
+├── androidPrivacy.json   # Android 隐私政策配置
+├── encrypt.js            # 加密工具函数
+├── swipe-control.css     # 滑动控制样式
+├── .gitignore            # Git 忽略配置
+├── README.md             # 项目说明文档
+├── LICENSE               # 许可证文件
+├── css/                  # 样式文件目录
+│   └── all.main.css.js   # 主样式文件
+├── img/                  # 图片资源目录
+│   ├── 1.png, 2.png, 3.png   # 应用图标和启动图
+│   └── view/             # 视图相关图片
+├── libs/                 # 第三方库目录
+│   ├── css/              # Font Awesome 样式
+│   ├── webfonts/         # Font Awesome 字体文件
+│   ├── tailwindcss.js    # Tailwind CSS 库
+│   ├── crypto-js.min.js  # CryptoJS 加密库
+│   ├── jsencrypt.min.js  # JSEncrypt 加密库
+│   ├── chart.umd.min.js  # 图表库
+│   └── forge.min.js      # 加密工具
+├── static/               # 静态资源目录
+│   ├── fwxy.html         # 服务协议页面
+│   ├── fwxy.txt          # 服务协议文本
+│   ├── xszc.txt          # 学生守则
+│   └── yszc.html         # 用户协议页面
+└── unpackage/            # 构建产物目录
+    ├── release/apk/      # APK 安装包（发布用）
+    ├── cache/            # 缓存文件（已忽略）
+    └── resources/        # 资源文件（已忽略）
+⚙️ 配置说明
+manifest.json 关键配置
+json
+{
+    "name": "大学课表",
+    "description": "福建财经政法大学课表",
+    "version": {
+        "name": "202639",
+        "code": 180
+    },
+    "android": {
+        "statusbar": { "immersed": true },    // 沉浸式状态栏
+        "navigationBar": { "hidden": true }   // 隐藏导航栏
+    }
+}
+配色方案配置
+应用支持自定义课程配色，配色数据存储在 localStorage 的 course 键中：
+json
+{
+    "color1": "#66ccff",
+    "color2": "#66e0c0",
+    "color3": "#ff99cc",
+    "color4": "#ccb3ff",
+    "color5": "#60A5FA"
+}
+🤝 贡献指南
+欢迎提交 Issue 和 Pull Request！
+开发规范
+请遵循项目现有的代码风格
+提交代码前请确保功能正常
+代码注释使用中文
+提交规范
+feat: 添加新功能
+fix: 修复 bug
+docs: 更新文档
+style: 代码格式调整
+refactor: 重构代码
+📜 许可证
+本项目采用 MIT 许可证 - 查看 LICENSE 文件了解详情
+📞 联系方式
+项目地址：https://github.com/GUY-ATM/ 福建财经政法大学课表
+问题反馈：请提交 Issue
+注意：本应用仅供福建江夏学院学生学习交流使用，请勿用于商业用途。
