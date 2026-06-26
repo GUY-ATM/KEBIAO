@@ -49,7 +49,6 @@
 - **Node.js**：版本 14.0+（可选，用于扩展开发）
 
 #### 构建步骤
-```bash
 # 1. 克隆仓库
 git clone https://github.com/GUY-ATM/福建财经政法大学课表.git
 
@@ -65,6 +64,7 @@ git clone https://github.com/GUY-ATM/福建财经政法大学课表.git
 
 # 方法三：云打包（生成安卓 APK 安装包）
 # 工具栏 → 发行 → 原生App-云打包 → Android → 填写配置 → 打包
+
 📁 项目结构
 plaintext
 福建财经政法大学课表/
@@ -126,6 +126,7 @@ json
     "color4": "#ccb3ff",
     "color5": "#60A5FA"
 }
+
 🤝 贡献指南
 欢迎提交 Issue 和 Pull Request！
 开发规范
@@ -138,8 +139,10 @@ fix: 修复 bug
 docs: 更新文档
 style: 代码格式调整
 refactor: 重构代码
+
 📜 许可证
 本项目采用 MIT 许可证 - 查看 LICENSE 文件了解详情
+
 📞 联系方式
 项目地址：https://github.com/GUY-ATM/福建财经政法大学课表
 问题反馈：请提交 Issue
