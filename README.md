@@ -1,8 +1,9 @@
 # 福建财经政法大学课表
 一款专为**福建财经政法大学**学生设计的课表查询应用，提供简洁高效的课程管理体验，仅适配安卓设备。
-<img width="270" height="600" alt="微信图片_20260627162002_351_13" src="https://github.com/user-attachments/assets/af72c9c1-fca3-4600-9d3e-222232ca9e80" />
-<img width="270" height="600" alt="微信图片_20260627162001_350_13" src="https://github.com/user-attachments/assets/65e7e047-1994-4792-bde6-d1b4849d9ed7" />
 <img width="270" height="600" alt="微信图片_20260627162812_353_13" src="https://github.com/user-attachments/assets/e639f789-339c-4e42-9892-64c807a29096" />
+<img width="270" height="600" alt="微信图片_20260627162001_350_13" src="https://github.com/user-attachments/assets/65e7e047-1994-4792-bde6-d1b4849d9ed7" />
+<img width="1080" height="2400" alt="微信图片_20260627163410_354_13" src="https://github.com/user-attachments/assets/2e7c7bc0-a8b3-4f93-bf2f-1d4a34f470a1" />
+
 
 ## ✨ 功能特点
 
